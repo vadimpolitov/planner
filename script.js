@@ -4,7 +4,12 @@ const list = document.querySelector("#task-list");
 const emptyMessage = document.querySelector("#empty-message");
 const taskCount = document.querySelector("#task-count");
 
-let tasks = [];
+const storageKey = "planner-tasks";
+let tasks = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+function saveTasks() {
+  localStorage.setItem(storageKey, JSON.stringify(tasks));
+}
 
 function updateSummary() {
   const completed = tasks.filter((task) => task.completed).length;
@@ -25,6 +30,7 @@ function renderTasks() {
     checkbox.id = `task-${index}`;
     checkbox.addEventListener("change", () => {
       task.completed = checkbox.checked;
+      saveTasks();
       renderTasks();
     });
 
@@ -39,6 +45,7 @@ function renderTasks() {
     removeButton.setAttribute("aria-label", `Удалить задачу: ${task.title}`);
     removeButton.addEventListener("click", () => {
       tasks = tasks.filter((currentTask) => currentTask !== task);
+      saveTasks();
       renderTasks();
     });
 
@@ -56,6 +63,7 @@ form.addEventListener("submit", (event) => {
   if (!title) return;
 
   tasks.push({ title, completed: false });
+  saveTasks();
   input.value = "";
   input.focus();
   renderTasks();
