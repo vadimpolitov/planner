@@ -66,14 +66,14 @@ button {
   border: 0;
   border-radius: 12px;
   color: #fff;
-  background: #347651;
+  background: #3867b2;
   font: inherit;
   font-weight: 650;
   cursor: pointer;
 }
 
 button:hover {
-  background: #285f40;
+  background: #2e5594;
 }
 
 ul {
