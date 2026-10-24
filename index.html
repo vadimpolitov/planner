@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Мой список дел</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="card">
+      <p class="eyebrow">Мой маленький проект</p>
+      <h1>Список дел</h1>
+      <p class="intro">Запиши небольшую задачу и отметь её, когда закончишь.</p>
+
+      <form id="task-form">
+        <label class="visually-hidden" for="task-input">Новая задача</label>
+        <input id="task-input" name="task" type="text" placeholder="Например, погулять" autocomplete="off" />
+        <button type="submit">Добавить</button>
+      </form>
+
+      <ul id="task-list" aria-live="polite"></ul>
+      <p id="empty-message" class="empty-message">Пока дел нет. Добавь первое!</p>
+      <p id="task-count" class="task-count">Выполнено: 0 из 0</p>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>
