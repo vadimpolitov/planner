@@ -711,12 +711,12 @@ function achievementList() {
   ];
 }
 
-// GIF scenes and matching static poses for reduced-motion settings.
+// One static key frame per character and scene.
 const characterScenes = { welcome: [0, 0, "welcome"], ready: [1, 0, "workout-start"], exercise: [2, 0, "exercise-complete"], rest: [3, 0, "rest"], restComplete: [2, 0, "rest-complete"], finished: [1, 1, "workout-complete"], progress: [2, 1, "personal-progress"], achievement: [3, 1, "achievement"], weekly: [0, 2, "weekly-goal"], measurement: [1, 2, "measurement"], thoughtful: [3, 2, "thoughtful"], disappointed: [0, 3, "disappointed"], support: [1, 3, "support"] };
 function characterMarkup(scene, size = "") {
   const [column, row, animation] = characterScenes[scene] || characterScenes.welcome;
   const character = activeProfile.id === "wife" ? "dasha" : "vadim";
-  return `<span class="character character-${character} ${size}" style="--character-x:${column * 100 / 3}%;--character-y:${row * 32.46}%;--character-gif:url('images/characters/${character}/${character}-${animation}.gif')" aria-hidden="true"></span>`;
+  return `<span class="character character-${character} ${size}" style="--character-image:url('images/frames/${character}/${character}-${animation}.png')" aria-hidden="true"></span>`;
 }
 
 function renderMotivation() {
