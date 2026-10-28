@@ -734,3 +734,57 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
   .value-picker-trigger { flex-basis:40px; min-width:40px; }
   .value-picker-dialog { max-height:calc(100dvh - 24px); }
 }
+
+/* Theme selection and dark palette */
+.theme-toggle { display:grid; flex:0 0 44px; width:44px; height:44px; place-items:center; padding:0; border:1px solid var(--line); border-radius:9px; color:#405343; background:#fff; font-size:23px; line-height:1; }
+.theme-toggle:hover { background:#f0f6eb; }
+:root[data-theme="dark"] { color-scheme:dark; color:#e8f0e9; background:#101812; --ink:#e8f0e9; --muted:#b1c0b4; --line:#3a4b3e; --panel:#1c2921; --green:#b2ed76; --green-dark:#e8f0e9; }
+:root[data-theme="dark"] .sidebar { border-color:var(--line); background:#17231b; }
+:root[data-theme="dark"] :is(.brand,.profile strong,.today-label,.calendar-day,.editor-row-title,.plan-row,.exercise-help-link,.value-picker-dialog h2) { color:#e8f0e9; }
+:root[data-theme="dark"] :is(.sidebar-label,.eyebrow,.topbar-caption,.profile-switcher,.subheading,.panel-description,.dialog-description,.plan-card-header p,.plan-notice p,.warmup-card p,.session-heading p:last-child,.workout-meta,.workout-hint,.program-editor-hint,.program-progress > p,.program-progress-footer > p,.plan-footer p,.plan-disclaimer,.body-empty p,.body-history-empty,.empty-state p,.history-card header p,.history-effort,.daily-history-row > p,.daily-history-values span,.session-date,.session-tools,.exercise-title p,.progression-hint,.exercise-log-count,.rest-hint,.set-table-head,.set-field,.set-number,.effort-card label span,.finish-row p,.app-footer,.ios-install-help,.value-picker-hint,.editor-row-meta,.exercise-library-content > p,.chart-empty p) { color:#b5c4b8; }
+:root[data-theme="dark"] :is(.nav-item,.nav-icon,.quiet-button,.back-button,.calendar-arrow,.calendar-today,.dialog-close,.history-tab,.secondary-button,.edit-session-button,.edit-measurement,.timer-button,.rest-timer-controls select,.exercise-done-button,.inline-timer,.value-picker-trigger,.value-picker-arrow,.value-picker-choice,.theme-toggle) { color:#d7e6d9; }
+:root[data-theme="dark"] :is(.nav-item:hover,.nav-item.active,.history-tab.active,.history-tab:hover:not(.active)) { color:#e8f0e9; background:#304a35; }
+:root[data-theme="dark"] .nav-item.active .nav-icon { color:#b2ed76; }
+:root[data-theme="dark"] :is(.sidebar-note,.plan-notice,.warmup-card,.exercise-library-create,.exercise-card-preview,.exercise-cue-block,.exercise-musclewiki-card,.chart-summary,.body-empty,.timer-display,.exercise-card.exercise-completed,.set-row.is-set-complete) { border-color:#3c5942; background:#263a2b; }
+:root[data-theme="dark"] :is(.plan-card,.plan-footer,.body-stat-card,.history-tabs,.empty-state,.history-card,.daily-history,.exercise-card,.effort-card,.calendar-panel,.selected-day-panel,.app-dialog,.session-edit-exercise) { border-color:var(--line); background:var(--panel); }
+:root[data-theme="dark"] :is(.plan-table-head,.measurement-table-head,.calendar-day,.plan-row,.set-row,.session-tools,.finish-row,.dialog-actions,.exercise-search-label) { border-color:var(--line); background:#223127; }
+:root[data-theme="dark"] :is(.plan-card-header,.plan-row,.exercise-preview li,.increase-chips span,.measurement-row,.waist-chart-heading,.history-card header,.history-exercises > div,.daily-history-row,.session-edit-set) { border-color:#35473a; }
+:root[data-theme="dark"] :is(.week-day,.quiet-button,.profile-switcher select,.secondary-button,.edit-session-button,.edit-measurement,.calendar-arrow,.calendar-today,.rest-timer-controls select,.timer-button,.exercise-done-button,.inline-timer,.value-picker-trigger,.value-picker-arrow,.value-picker-choice,.theme-toggle) { border-color:#45604a; background:#26372b; }
+:root[data-theme="dark"] :is(.secondary-button:hover,.edit-session-button:hover,.edit-measurement:hover,.calendar-arrow:hover,.calendar-today:hover,.inline-timer:hover,.value-picker-trigger:hover,.value-picker-choice:hover,.theme-toggle:hover,.dialog-close:hover,.back-button:hover) { color:#f2f8f1; border-color:#73996f; background:#36513b; }
+:root[data-theme="dark"] :is(.week-day.is-today,.calendar-day.is-selected,.timer-button.timer-running,.timer-finished,.value-picker-choice[aria-pressed="true"],.exercise-completed .exercise-done-button,.set-row.is-next-set) { color:#e1f2dc; border-color:#82ba69; background:#36543a; }
+:root[data-theme="dark"] :is(.week-day span,.week-day.is-today span,.body-stat-card > span,.body-stat-card > p,.chart-legend,.chart-summary-period,.exercise-total,.alternatives,.rest-cell,.plan-row > b,.exercise-preview b,.exercise-preview li,.history-exercises strong,.history-exercises span,.measurement-row time,.measurement-row strong,.daily-history-row time,.daily-history-values b,.increase-chips span,.increase-chips b,.set-field > label,.set-check,.effort-control strong,.editor-row-meta,.exercise-card-preview,.exercise-card-preview span,.exercise-library-create > summary,.value-picker-dialog h3,.exercise-cue,.exercise-musclewiki-copy > p:not(.eyebrow),.plan-editor-row > summary::after) { color:#c2d1c5; }
+:root[data-theme="dark"] :is(.daily-form label,.dialog-form label,.plan-editor-row label,.exercise-library-fields label,.session-edit-heading label,.session-edit-set label) { color:#c2d1c5; }
+:root[data-theme="dark"] :is(.daily-form input,.daily-form select,.daily-form textarea,.dialog-form input,.dialog-form select,.plan-editor-row input,.plan-editor-row select,.exercise-library-fields input,.exercise-library-fields textarea,.set-row input,.variant-select) { color:#edf5ee; background:#18241c; border-color:#4b6250; }
+:root[data-theme="dark"] :is(input,textarea)::placeholder { color:#9bada0; }
+:root[data-theme="dark"] :is(.workout-badge,.exercise-number,.footer-icon,.panel-icon,.avatar,.exercise-musclewiki-mark) { color:#dff3d8; background:#38563b; }
+:root[data-theme="dark"] :is(.exercise-musclewiki-link,.primary-button) { color:#18291c; background:#b2ed76; border-color:#b2ed76; }
+:root[data-theme="dark"] :is(.exercise-musclewiki-link:hover,.primary-button:hover) { color:#18291c; background:#c5f590; }
+:root[data-theme="dark"] :is(.danger-button,.danger-text-button) { color:#ffd0c8; background:#392b29; border-color:#795049; }
+:root[data-theme="dark"] :is(.danger-button:hover,.danger-text-button:hover) { color:#ffe0da; background:#563632; border-color:#a7736a; }
+:root[data-theme="dark"] :is(.dialog-error) { color:#ffb4a8; }
+:root[data-theme="dark"] :is(.text-button,.form-status,.import-status,.app-footer button,.scheduled-next-date,.history-exercises .history-exercise-done strong) { color:#b8e79b; }
+:root[data-theme="dark"] :is(.text-button:hover) { color:#dcf5c9; background:#304a35; }
+:root[data-theme="dark"] :is(.history-status,.week-plan,.workout-dot,.calendar-legend .legend-a) { color:#def2d7; background:#39583e; }
+:root[data-theme="dark"] :is(.history-status.is-partial,.partial-dot) { color:#ffe1a9; background:#594a2e; }
+:root[data-theme="dark"] :is(.workout-dot.b,.calendar-legend .legend-b) { color:#e8dbff; background:#55456a; }
+:root[data-theme="dark"] :is(.done-dot,.calendar-legend .legend-done) { color:#e7f7e6; background:#4c7251; }
+:root[data-theme="dark"] :is(.program-progress-heading strong,.program-progress-heading > span,.plan-notice strong,.warmup-card strong,.timer-display-header,.exercise-cue-block h3,.value-picker-dialog h3) { color:#e4f1df; }
+:root[data-theme="dark"] :is(.program-progress-track,.exercise-log-progress > div,.timer-track) { background:#3b4e3e; }
+:root[data-theme="dark"] .chart-grid-line { stroke:#435548; }
+:root[data-theme="dark"] :is(.chart-axis-label,.chart-date-label,.chart-value-label) { fill:#c2d1c5; }
+:root[data-theme="dark"] .chart-point { fill:#1c2921; }
+:root[data-theme="dark"] :is(.chart-line.waist-chart-line,.chart-point.waist-chart-line) { stroke:#85c6ec; }
+:root[data-theme="dark"] .waist-legend i { background:#85c6ec; }
+:root[data-theme="dark"] .chart-summary-value { color:#d4e9ca; }
+:root[data-theme="dark"] .chart-summary-value.trend-up { color:#ffd09b; }
+:root[data-theme="dark"] .chart-summary-value.trend-down { color:#b8e79b; }
+:root[data-theme="dark"] .toast { color:#e2f2df; background:#263a2b; border-color:#4a704c; }
+:root[data-theme="dark"] :where(button,a[href],input,select,textarea):focus-visible { outline-color:#b2ed76; }
+@media(max-width:400px) { .topbar-actions { flex-wrap:wrap; } }
+:root[data-theme="dark"] .profile-switcher select { color:#e4f0e5; }
+:root[data-theme="dark"] .body-stat-card > strong small { color:#b5c4b8; }
+:root[data-theme="dark"] .plan-editor-row > summary::after { color:#b5c4b8; }
+:root[data-theme="dark"] .effort-card label strong { color:#e4f1df; }
+:root[data-theme="dark"] .calendar-legend { color:#c2d1c5; }
+:root[data-theme="dark"] .app-footer > span:first-child { color:#c2d1c5; }
+@media(max-width:620px) { .chart-summary-value { flex:0 1 auto; } }

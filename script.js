@@ -1566,7 +1566,23 @@ function switchProfile(profileId) {
   window.scrollTo(0, 0);
 }
 
+function applyTheme(theme) {
+  const dark = theme === "dark";
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  const button = document.querySelector("#theme-toggle");
+  button.setAttribute("aria-pressed", String(dark));
+  button.title = dark ? "Включить светлую тему" : "Включить тёмную тему";
+  document.querySelector("#theme-icon").textContent = dark ? "☀" : "☾";
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", dark ? "#101812" : "#f4f5f2");
+  try { window.RitmTimer?.setDarkTheme?.(dark); } catch {}
+}
+
 function bindEvents() {
+  document.querySelector("#theme-toggle").addEventListener("click", () => {
+    const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(theme);
+    try { localStorage.setItem("ritm-theme", theme); } catch { showToast("Не удалось сохранить тему на этом устройстве."); }
+  });
   document.querySelector("#profile-switcher").addEventListener("change", (event) => switchProfile(event.currentTarget.value));
   document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => {
     const view = button.dataset.view;
@@ -1799,6 +1815,7 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
+applyTheme(document.documentElement.dataset.theme);
 renderProfileSelector();
 bindEvents();
 renderOverview();

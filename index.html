@@ -9,7 +9,8 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
-    <link rel="stylesheet" href="style.css?v=2.5" />
+    <script>try { document.documentElement.dataset.theme = localStorage.getItem("ritm-theme") === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }</script>
+    <link rel="stylesheet" href="style.css?v=2.6" />
   </head>
   <body>
     <div class="app-shell">
@@ -36,7 +37,7 @@
       <main class="main-content">
         <header class="topbar">
           <div><span class="today-label" id="today-label"></span><span class="topbar-caption">Тренировочный дневник</span></div>
-          <div class="topbar-actions"><label class="profile-switcher"><span>Профиль</span><select id="profile-switcher" aria-label="Активный профиль"></select></label><button class="quiet-button" id="today-button" type="button">Сегодня <span>⌄</span></button></div>
+          <div class="topbar-actions"><label class="profile-switcher"><span>Профиль</span><select id="profile-switcher" aria-label="Активный профиль"></select></label><button class="theme-toggle" id="theme-toggle" type="button" aria-label="Тёмная тема" aria-pressed="false" title="Тёмная тема"><span id="theme-icon" aria-hidden="true">☾</span></button><button class="quiet-button" id="today-button" type="button">Сегодня <span>⌄</span></button></div>
         </header>
 
         <section class="view active" id="view-overview" aria-labelledby="page-title">
@@ -183,6 +184,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=2.5"></script>
+    <script src="script.js?v=2.6"></script>
   </body>
 </html>
