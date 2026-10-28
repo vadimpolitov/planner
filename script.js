@@ -5,6 +5,7 @@ let activeProfile = null;
 let storageKey = storageKeyBase;
 const restTimer = { interval: null, remaining: 0, endAt: 0, duration: 0, activeIndex: null, finished: false };
 let timerAudioContext = null;
+let timerSound = null;
 let timerPresetManuallyChanged = false;
 let timerPresetSeconds = "150";
 
@@ -966,7 +967,7 @@ function renderSession() {
   if (!draft) return showView("overview");
   const plan = draft.planSnapshot || workoutPlans[draft.workout];
   document.querySelector("#session-date").textContent = formatDate(draft.date, { day: "numeric", month: "long", year: "numeric" });
-  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><div class="warmup-card"><span>↗</span><p><strong>Разминка</strong> · 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></div><div class="session-tools"><span>Записывай подходы · таймер со звуком.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
+  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><div class="warmup-card"><span>↗</span><p><strong>Разминка</strong> · 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></div><div class="session-tools"><span>5 сигналов и гонг${window.RitmTimer ? "" : " · фоновый звук зависит от браузера"}.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
   bindSessionEvents();
   if (restTimer.interval || restTimer.finished) updateRestTimer();
 }
@@ -1089,6 +1090,7 @@ function bindSessionEvents() {
 }
 
 function stopTimer() {
+  stopRestSound();
   clearInterval(restTimer.interval);
   restTimer.interval = null;
   restTimer.endAt = 0;
@@ -1106,11 +1108,18 @@ function updateRestTimer() {
   if (!restTimer.interval && !restTimer.finished) return;
   const remaining = restTimer.interval ? Math.max(0, Math.ceil((restTimer.endAt - Date.now()) / 1000)) : 0;
   restTimer.remaining = remaining;
+  if (restTimer.interval && timerSound?.mode === "fallback" && remaining > 0 && remaining <= 5 && timerSound.lastCue !== remaining) {
+    timerSound.lastCue = remaining;
+    playFallbackCue(false);
+  }
   if (restTimer.interval && remaining === 0) {
     clearInterval(restTimer.interval);
     restTimer.interval = null;
     restTimer.finished = true;
-    playTimerSignal();
+    if (timerSound?.mode === "fallback") playFallbackCue(true);
+    if (timerSound?.mode === "audio" && timerSound.audio.currentTime < restTimer.duration - 1) {
+      try { timerSound.audio.currentTime = restTimer.duration; } catch {}
+    }
     showToast("Время отдыха закончилось");
   }
   const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
@@ -1137,6 +1146,7 @@ function updateRestTimer() {
 
 function startTimer(restType, sourceButton = null) {
   clearInterval(restTimer.interval);
+  stopRestSound();
   const preset = document.querySelector("#timer-preset");
   if (!timerPresetManuallyChanged) preset.value = restType === "short" ? "75" : "150";
   timerPresetSeconds = preset.value;
@@ -1145,9 +1155,7 @@ function startTimer(restType, sourceButton = null) {
   restTimer.endAt = Date.now() + restTimer.duration * 1000;
   restTimer.activeIndex = sourceButton ? Number(sourceButton.closest("[data-exercise-card]").dataset.exerciseCard) : null;
   restTimer.finished = false;
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (AudioContextClass && !timerAudioContext) timerAudioContext = new AudioContextClass();
-  timerAudioContext?.resume().catch(() => {});
+  startRestSound(restTimer.duration, restTimer.endAt);
   restTimer.interval = setInterval(updateRestTimer, 250);
   updateRestTimer();
 }
@@ -1156,19 +1164,113 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && restTimer.interval) updateRestTimer();
 });
 
-function playTimerSignal() {
-  if (!timerAudioContext) return;
+// The whole audio track is prepared on the start tap so playback does not depend on page timers.
+function buildRestSoundTrack(seconds) {
+  const sampleRate = 16000;
+  const samples = Math.ceil((seconds + 1.6) * sampleRate);
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  const text = (offset, value) => [...value].forEach((char, index) => view.setUint8(offset + index, char.charCodeAt(0)));
+  text(0, "RIFF"); view.setUint32(4, 36 + samples * 2, true); text(8, "WAVE");
+  text(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  text(36, "data"); view.setUint32(40, samples * 2, true);
+  const writeSound = (start, duration, sample) => {
+    const first = Math.max(0, Math.round(start * sampleRate));
+    const length = Math.round(duration * sampleRate);
+    for (let i = 0; i < length && first + i < samples; i++) {
+      const value = Math.max(-1, Math.min(1, sample(i / sampleRate, duration)));
+      view.setInt16(44 + (first + i) * 2, Math.round(value * 32767), true);
+    }
+  };
+  for (let remaining = 5; remaining >= 1; remaining--) {
+    if (seconds < remaining) continue;
+    writeSound(seconds - remaining, .16, (t, duration) => .48 * Math.sin(2 * Math.PI * 880 * t) * Math.min(1, t / .008, (duration - t) / .025));
+  }
+  writeSound(seconds, 1.5, (t) => {
+    const attack = Math.min(1, t / .012);
+    const decay = Math.exp(-2.5 * t);
+    return attack * decay * (.30 * Math.sin(2 * Math.PI * 180 * t) + .23 * Math.sin(2 * Math.PI * 287 * t) + .15 * Math.sin(2 * Math.PI * 437 * t) + .10 * Math.sin(2 * Math.PI * 711 * t));
+  });
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+function stopRestSound() {
+  const sound = timerSound;
+  timerSound = null;
+  if (!sound) return;
+  if (sound.mode === "native") {
+    try { window.RitmTimer?.cancel(); } catch {}
+  }
+  if (sound.audio) {
+    sound.audio.pause();
+    sound.audio.removeAttribute("src");
+    sound.audio.load();
+  }
+  if (sound.url) URL.revokeObjectURL(sound.url);
+  if (sound.previousAudioSession && navigator.audioSession) {
+    try { navigator.audioSession.type = sound.previousAudioSession; } catch {}
+  }
+}
+
+function startRestSound(seconds, endAt) {
+  if (window.RitmTimer?.start) {
+    try {
+      if (window.RitmTimer.start(endAt)) { timerSound = { mode: "native" }; return; }
+    } catch {}
+    showToast("Фоновый таймер недоступен. Проверь звук и работу приложения на телефоне.");
+  }
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  try {
+    if (AudioContextClass && !timerAudioContext) timerAudioContext = new AudioContextClass();
+    timerAudioContext?.resume().catch(() => {});
+    const audio = new Audio();
+    const url = URL.createObjectURL(buildRestSoundTrack(seconds));
+    const sound = { mode: "audio", audio, url, lastCue: null, previousAudioSession: null };
+    timerSound = sound;
+    if (navigator.audioSession) {
+      try { sound.previousAudioSession = navigator.audioSession.type; navigator.audioSession.type = "playback"; } catch {}
+    }
+    audio.preload = "auto";
+    audio.playsInline = true;
+    audio.src = url;
+    audio.addEventListener("ended", () => {
+      if (timerSound !== sound) return;
+      sound.mode = "played";
+      URL.revokeObjectURL(sound.url);
+      sound.url = null;
+      if (sound.previousAudioSession && navigator.audioSession) {
+        try { navigator.audioSession.type = sound.previousAudioSession; } catch {}
+        sound.previousAudioSession = null;
+      }
+    }, { once: true });
+    const started = audio.play();
+    if (started?.catch) started.catch(() => {
+      if (timerSound !== sound) return;
+      sound.mode = "fallback";
+      showToast("Браузер ограничил фоновый звук. Оставь экран включённым и проверь громкость.");
+    });
+  } catch {
+    timerSound = { mode: "fallback", lastCue: null };
+    showToast("Фоновый звук недоступен. Оставь экран включённым и проверь громкость.");
+  }
+}
+
+function playFallbackCue(gong) {
+  if (!timerAudioContext || timerAudioContext.state !== "running") return;
   const now = timerAudioContext.currentTime;
-  [0, 0.24, 0.48].forEach((offset) => {
+  const tones = gong ? [[180, .30], [287, .23], [437, .15], [711, .10]] : [[880, .48]];
+  const length = gong ? 1.5 : .16;
+  tones.forEach(([frequency, volume]) => {
     const oscillator = timerAudioContext.createOscillator();
     const gain = timerAudioContext.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = offset === 0.24 ? 660 : 880;
-    gain.gain.setValueAtTime(0.0001, now + offset);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.025);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.18);
+    oscillator.type = "sine"; oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.linearRampToValueAtTime(volume, now + .012);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + length);
     oscillator.connect(gain); gain.connect(timerAudioContext.destination);
-    oscillator.start(now + offset); oscillator.stop(now + offset + 0.19);
+    oscillator.start(now); oscillator.stop(now + length);
   });
 }
 
