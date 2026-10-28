@@ -1,72 +1,1511 @@
-const form = document.querySelector("#task-form");
-const input = document.querySelector("#task-input");
-const list = document.querySelector("#task-list");
-const emptyMessage = document.querySelector("#empty-message");
-const taskCount = document.querySelector("#task-count");
+const storageKey = "planner-workout-tracker";
+const restTimer = { interval: null, remaining: 0, activeButton: null };
+let timerAudioContext = null;
+let timerPresetManuallyChanged = false;
+let timerPresetSeconds = "150";
 
-const storageKey = "planner-tasks";
-let tasks = JSON.parse(localStorage.getItem(storageKey) || "[]");
+const defaultWorkoutPlans = {
+  A: {
+    name: "Тренировка А",
+    subtitle: "Приседания, жимы и контролируемая работа задней цепи",
+    exercises: [
+      { name: "Приседания со штангой", helpId: "squat", sets: 3, min: 6, max: 8, kind: "lower", rest: "long" },
+      { name: "Жим штанги лёжа", helpId: "bench", sets: 3, min: 6, max: 8, kind: "upper", rest: "long" },
+      { name: "Тяга штанги в наклоне", helpId: "row", optionHelpIds: ["row", "supported-row"], options: ["Тяга штанги в наклоне", "Тяга с опорой грудью"], sets: 3, min: 8, max: 10, kind: "upper", rest: "long" },
+      { name: "Румынская тяга", helpId: "romanian-deadlift", sets: 3, min: 8, max: 10, kind: "lower", rest: "long" },
+      { name: "Жим гантелей сидя", helpId: "overhead-press", sets: 2, min: 10, max: 12, kind: "upper", rest: "short" },
+      { name: "Разгибание рук на блоке", helpId: "triceps-pushdown", sets: 2, min: 10, max: 15, kind: "isolation", rest: "short" },
+      { name: "Скручивания на блоке с весом", helpId: "cable-crunch", sets: 3, min: 10, max: 15, kind: "isolation", rest: "short" },
+    ],
+  },
+  B: {
+    name: "Тренировка Б",
+    subtitle: "Тяга, наклонный жим и односторонняя работа ног",
+    exercises: [
+      { name: "Становая тяга классическая", helpId: "deadlift", sets: 2, min: 4, max: 6, kind: "lower", rest: "long" },
+      { name: "Жим штанги под углом 30°", helpId: "incline-press", sets: 3, min: 8, max: 10, kind: "upper", rest: "long" },
+      { name: "Подтягивания", helpId: "pullup", optionHelpIds: ["pullup", "lat-pulldown"], options: ["Подтягивания", "Тяга верхнего блока"], sets: 3, min: 6, max: 10, kind: "upper", rest: "long" },
+      { name: "Болгарские выпады с гантелями", helpId: "split-squat", sets: 3, min: 8, max: 10, kind: "accessory", rest: "long", sideNote: "на ногу" },
+      { name: "Сгибание одной ноги в кроссовере с манжетой", helpId: "cable-leg-curl", sets: 2, min: 12, max: 15, kind: "isolation", rest: "short" },
+      { name: "Махи гантелями в стороны", helpId: "lateral-raise", sets: 3, min: 12, max: 20, kind: "isolation", rest: "short" },
+      { name: "Подъём на бицепс", helpId: "biceps-curl", options: ["Подъём штанги на бицепс", "Подъём гантелей на бицепс"], sets: 2, min: 10, max: 15, kind: "isolation", rest: "short" },
+      { name: "Pallof press в кроссовере", helpId: "pallof", sets: 2, min: 10, max: 12, kind: "isolation", rest: "short", sideNote: "на сторону" },
+    ],
+  },
+};
 
-function saveTasks() {
-  localStorage.setItem(storageKey, JSON.stringify(tasks));
+function exerciseNameKey(name) {
+  return String(name || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
 }
 
-function updateSummary() {
-  const completed = tasks.filter((task) => task.completed).length;
-  taskCount.textContent = `Выполнено: ${completed} из ${tasks.length}`;
-  emptyMessage.hidden = tasks.length > 0;
+function exerciseHash(name) {
+  let hash = 2166136261;
+  for (const character of exerciseNameKey(name)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return (hash >>> 0).toString(36);
 }
 
-function renderTasks() {
-  list.replaceChildren();
-
-  tasks.forEach((task, index) => {
-    const item = document.createElement("li");
-    item.className = task.completed ? "task done" : "task";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = task.completed;
-    checkbox.id = `task-${index}`;
-    checkbox.addEventListener("change", () => {
-      task.completed = checkbox.checked;
-      saveTasks();
-      renderTasks();
+function mergeExerciseLibrary(savedLibrary = [], plans = defaultWorkoutPlans) {
+  const cards = new Map();
+  const builtInHelpIds = new Set(Object.values(defaultWorkoutPlans)
+    .flatMap((plan) => plan.exercises.flatMap((exercise) => [exercise.helpId, ...(exercise.optionHelpIds || [])])).filter(Boolean));
+  const addCard = (exercise, name, helpId, custom = false) => {
+    const key = exerciseNameKey(name);
+    if (!key || cards.has(key)) return;
+    const id = exercise.id || (custom ? `custom-${exerciseHash(name)}` : `exercise-${exerciseHash(`${helpId}-${name}`)}`);
+    const resolvedHelpId = custom && (!helpId || helpId === "general") ? id : helpId || "general";
+    cards.set(key, {
+      id, name: String(name).trim(), helpId: resolvedHelpId, custom,
+      summary: String(exercise.summary || ""), steps: String(exercise.steps || ""),
+      kind: exercise.kind || undefined,
+      options: Array.isArray(exercise.options) ? [...exercise.options] : undefined,
+      optionHelpIds: Array.isArray(exercise.optionHelpIds) ? [...exercise.optionHelpIds] : undefined,
+      sideNote: exercise.sideNote || undefined,
     });
-
-    const label = document.createElement("label");
-    label.htmlFor = checkbox.id;
-    label.textContent = task.title;
-
-    const removeButton = document.createElement("button");
-    removeButton.type = "button";
-    removeButton.className = "remove-button";
-    removeButton.textContent = "Удалить";
-    removeButton.setAttribute("aria-label", `Удалить задачу: ${task.title}`);
-    removeButton.addEventListener("click", () => {
-      tasks = tasks.filter((currentTask) => currentTask !== task);
-      saveTasks();
-      renderTasks();
+  };
+  for (const sourcePlans of [defaultWorkoutPlans, plans]) {
+    for (const plan of Object.values(sourcePlans || {})) {
+      for (const exercise of plan?.exercises || []) {
+        addCard(exercise, exercise.name, exercise.helpId, !exercise.helpId || !builtInHelpIds.has(exercise.helpId));
+        for (const [index, option] of (exercise.options || []).entries()) {
+          addCard({ ...exercise, options: index === 0 ? exercise.options : undefined }, option,
+            exercise.optionHelpIds?.[index] || exercise.helpId,
+            !builtInHelpIds.has(exercise.optionHelpIds?.[index] || exercise.helpId));
+        }
+      }
+    }
+  }
+  for (const saved of Array.isArray(savedLibrary) ? savedLibrary : []) {
+    if (!saved || typeof saved.name !== "string" || !saved.name.trim()) continue;
+    const key = exerciseNameKey(saved.name);
+    const old = cards.get(key);
+    const id = String(saved.id || old?.id || `custom-${exerciseHash(saved.name)}`);
+    const custom = Boolean(saved.custom ?? old?.custom);
+    cards.set(key, {
+      ...(old || {}), ...saved,
+      id, name: saved.name.trim(), helpId: custom && (!saved.helpId || saved.helpId === "general")
+        ? id : saved.helpId || old?.helpId || "general",
+      custom,
+      summary: String(saved.summary || ""), steps: String(saved.steps || ""),
     });
-
-    item.append(checkbox, label, removeButton);
-    list.append(item);
-  });
-
-  updateSummary();
+  }
+  return [...cards.values()];
 }
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const title = input.value.trim();
+let workoutPlans = structuredClone(defaultWorkoutPlans);
+const defaultData = { sessions: [], daily: {}, currentSession: null, scheduled: [], plans: null, exerciseLibrary: [], programCycle: null };
+let dataLoadWarning = false;
+let corruptStoredData = null;
+let data = loadData();
+workoutPlans = data.planVersion === 2 && data.plans ? data.plans : structuredClone(defaultWorkoutPlans);
+// Keep previously saved plans intact while attaching the correct help for each pull-up option.
+const savedPullupPlan = workoutPlans.B?.exercises?.find((exercise) => Array.isArray(exercise.options)
+  && exercise.options.includes("Подтягивания") && exercise.options.includes("Тяга верхнего блока"));
+if (savedPullupPlan) {
+  savedPullupPlan.helpId = "pullup";
+  savedPullupPlan.optionHelpIds = ["pullup", "lat-pulldown"];
+}
+data.plans = workoutPlans;
+data.exerciseLibrary = mergeExerciseLibrary(data.exerciseLibrary, workoutPlans);
+data.planVersion = 2;
+data.currentSession = normalizeCurrentSession(data.currentSession, workoutPlans);
+data.programCycle = normalizeProgramCycle(data.programCycle, data.sessions);
+if (corruptStoredData !== null) {
+  try { localStorage.setItem(`${storageKey}-recovery-${Date.now()}`, corruptStoredData); } catch {}
+}
+saveData();
+const dialogReturnFocus = new WeakMap();
+let selectedHistory = "workouts";
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let selectedCalendarDate = localDateKey();
+let selectedEditorWorkout = "A";
+let editingBodyDate = null;
+let editingSessionId = null;
+const exerciseImages = {
+  squat: ["championat/squat.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5167991-chto-takoe-olimpijskie-prisedaniya-prisedaniya-so-shtangoj-na-spine.html"],
+  bench: ["championat/bench.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4488421-kak-pravilno-delat-bazovye-uprazhneniya-bezopasnaya-tehnika-zhima-lezha-stanovoj-tyagi-prisedanij-so-shtangoj.html"],
+  row: ["championat/tyaga-shtangi.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5388400-tyaga-shtangi-v-naklone-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html"],
+  "romanian-deadlift": ["championat/romanian-deadlift.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5710238-rumynskaya-tyaga-so-shtangoj-tehnika-vypolneniya-kakie-myshcy-rabotayut-kak-pravilno-delat-uprazhnenie.html"],
+  "overhead-press": ["championat/overhead-press.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5809758-zhim-gantelej-sidya-tehnika-vypolneniya-kakie-myshcy-rabotayut.html"],
+  "triceps-pushdown": ["championat/triceps-pushdown.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4941031-5-luchshih-uprazhnenij-na-triceps-v-trenazhyornom-zale-dlya-muzhchin-ot-trenera.html"],
+  "cable-crunch": ["championat/cable-crunch.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4602635-molitva-uprazhnenie-na-press-na-trenazhyore-tehnika-vypolneniya-video.html"],
+  pallof: ["open-source/pallof-press-sequence.svg", "Bryl Lim", "CC BY-SA 4.0", "", "Три положения Pallof press.", "https://bryllim.github.io/workout-guide/exercises/pallof-press/"],
+  deadlift: ["championat/deadlift.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5310910-stanovaya-tyaga-normativy-tehnika-vypolneniya-vidy-stanovoj-tyagi.html"],
+  "incline-press": ["championat/incline-press.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5782466-zhim-shtangi-na-naklonnoj-skame-tehnika-vypolneniya-kakie-myshcy-rabotayut.html"],
+  "lat-pulldown": ["championat/lat-pulldown.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5404742-tyaga-verhnego-bloka-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html"],
+  pullup: ["open-source/pullup-landscape.jpg", "PTPioneer (Tyler Read) / Wikimedia Commons", "CC BY 2.0", "", "Подтягивание на перекладине.", "https://commons.wikimedia.org/wiki/File:Pull-ups_exercise_from_back.jpg"],
+  "split-squat": ["championat/split-squat.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5138357-bolgarskie-vypady-pravilnaya-tehnika-i-glavnye-oshibki.html"],
+  "lateral-raise": ["championat/lateral-raise.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5774694-mahi-gantelyami-v-storonu-kak-pravilno-delat-stoya-sidya-v-naklone-tehnika-vypolneniya.html"],
+  "biceps-curl": ["championat/biceps-curl.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4933279-4-luchshih-uprazhneniya-na-biceps-dlya-muzhchin-v-trenazhernom-zale.html"],
+};
+const exerciseHelp = {
+  squat: ["Присед со штангой", "Приседай только в той глубине, где сохраняешь устойчивую стопу и положение спины.", "Настрой стойки примерно на высоте середины груди; расположи гриф на верхней части спины, а не на шее; возьмись симметрично и собери лопатки.; Сними гриф, отступи коротко и поставь стопы в устойчивую ширину; вдохни животом и напряги корпус кругом.; Начни одновременно сгибать колени и таз; колени веди в направлении носков, пятки и основание большого пальца оставляй прижатыми.; Опускайся до глубины, на которой не теряешь равновесие и контроль таза; не ищи глубину ценой боли или округления поясницы.; Оттолкнись всей стопой и поднимись; колени продолжают смотреть в сторону носков, корпус не раскачивай.; Сбрось вдох после трудной части повтора; между повторами восстанови напряжение. Частые ошибки: пятки отрываются, колени резко заваливаются внутрь, гриф уходит от середины стопы.", "Начни с пустого грифа и используй страховочные упоры, выставленные чуть ниже нижней точки приседа."],
+  bench: ["Жим лёжа", "Поставь тело устойчиво и опускай гриф по контролируемой траектории к нижней части груди.", "Ляг так, чтобы глаза были примерно под грифом; стопы полностью на полу, голова и таз остаются на скамье.; Возьмись симметрично чуть шире плеч; сведи лопатки и мягко прижми их к скамье, сохраняя естественный прогиб.; Сними гриф над плечами; вдохни и опускай его плавно к нижней части груди, удерживая запястья над локтями.; Локти направляй по диагонали относительно корпуса, не разводи их строго в стороны; предплечья внизу близки к вертикали.; Выжми гриф вверх и немного назад к положению над плечами; не отбивай от груди и не отрывай таз.; Выдыхай во время выжима. Ошибки: неровный хват, потерянные лопатки, резкий отскок, боль в плече.", "Используй страховочные упоры или страхующего; прекращай подход, если штанга перестаёт двигаться под контролем."],
+  row: ["Тяга штанги в наклоне", "Наклони корпус примерно на 45° и тяни гриф к нижней части живота, сохраняя положение спины и корпуса неподвижным.", "Поставь стопы примерно на ширине плеч, слегка согни колени и отведи таз назад; наклони корпус примерно на 45°.; Возьмись за гриф хватом сверху чуть шире плеч; собери лопатки, напряги живот, держи шею продолжением позвоночника.; Сними штангу со стоек или подними с пола с контролем спины; держи гриф близко к ногам.; На выдохе подтяни гриф от колен к нижней части живота. Локти веди назад; не поднимай плечи и не раскачивай корпус.; В верхней точке ненадолго сведи лопатки, затем на вдохе плавно опусти штангу до почти прямых рук.; Сохраняй наклон и положение спины на протяжении повторов. Если корпус начинает подниматься или движение становится рывковым, уменьши вес.; Частые ошибки: округление спины, рывок ногами и поясницей, слишком тяжёлый вес, сокращённая амплитуда.", "Начни с лёгкого веса или пустого грифа. Если не получается сохранять неподвижный наклон без дискомфорта, выбери тягу с опорой грудью."],
+  "supported-row": ["Тяга с опорой грудью", "Опора снимает необходимость удерживать корпус в наклоне; грудь всё время остаётся на подушке.", "Настрой наклонную скамью или тренажёр так, чтобы рукояти были доступны при вытянутых руках.; Прижми грудь к опоре, стопы поставь устойчиво; плечи опусти от ушей и сохрани нейтральную шею.; Потяни рукояти к бокам корпуса, сводя лопатки без сильного пожимания плечами.; Медленно выпрями руки и дай лопаткам контролируемо разойтись; не бросай вес в нижней точке.; Ошибки: отрыв груди от подушки, рывок корпусом, чрезмерное подтягивание плеч к ушам.", "Не увеличивай амплитуду ценой отрыва корпуса от опоры."],
+  "romanian-deadlift": ["Румынская тяга", "Это наклон в тазобедренных суставах: голени почти неподвижны, штанга скользит близко к ногам.", "Встань прямо, держи гриф у бёдер; стопы примерно на ширине таза, колени слегка согнуты.; Вдохни, напряги живот и отведи таз назад, будто закрываешь им дверь; колени сохраняют небольшой сгиб.; Опускай гриф вдоль бёдер и голеней; плечи и таз движутся вместе, спина остаётся в удобном нейтральном положении.; Остановись, когда почувствуешь натяжение задней поверхности бедра или раньше, если спина начинает округляться.; Выдохни и разогни таз, сжав ягодицы; не отклоняйся назад в верхней точке.; Ошибки: превращать движение в присед, уводить гриф вперёд, опускаться ниже доступной подвижности.", "Используй лёгкий вес, пока не получается повторять движение тазом без округления поясницы."],
+  deadlift: ["Становая тяга", "Начинай подъём с натяжения штанги и толчка ногами в пол; держи гриф близко к телу.", "Поставь стопы так, чтобы гриф был над серединой стопы; голени рядом с грифом, хват снаружи ног.; Отведи таз, возьмись за гриф и собери корпус; вдохни, напряги живот и убери слабину грифа до начала подъёма.; Дави стопами в пол и разгибай колени и таз согласованно; гриф движется близко к голеням и бёдрам.; Встань прямо, не отклоняясь назад и не переразгибая поясницу.; Отведи таз назад, затем согни колени, чтобы опустить гриф по тому же близкому пути; не бросай его.; Ошибки: дёргать гриф с пола, округлять спину, держать штангу далеко от ног.", "Начни с лёгкого веса и сними подход, если не можешь сохранять одинаковую стартовую позицию."],
+  "overhead-press": ["Жим гантелей сидя", "Сохраняй опору стоп и корпуса; гантели движутся над плечами в безболезненной амплитуде.", "Сядь на скамью с опорой спины; стопы прижаты к полу, корпус собран, гантели у плеч.; Предплечья расположи близко к вертикали, кисти держи над локтями; не заламывай запястья назад.; Выжми гантели вверх и слегка навстречу друг другу, не ударяя их; не прогибайся и не выталкивай рёбра вперёд.; На вдохе опусти гантели контролируемо к уровню плеч или комфортной нижней точке.; Ошибки: чрезмерный прогиб, рывок ногами, опускание через боль в плече.", "Если плечо неприятно реагирует, сократи амплитуду и снизь вес; не продавливай боль."],
+  "incline-press": ["Жим штанги под углом", "Настрой умеренный наклон и опускай гриф к верхней части груди с контролем.", "Установи спинку примерно на 30 градусов; ляг устойчиво, стопы на полу, лопатки сведены и прижаты к скамье.; Возьмись симметрично; сними гриф над плечами, запястья держи над локтями.; Вдохни и опускай гриф к верхней части груди; локти направлены под комфортным углом, не строго в стороны.; Выжми гриф вверх над плечами без отбива; таз остаётся на скамье.; Ошибки: слишком крутая скамья, отрыв лопаток, чрезмерно широкое разведение локтей.", "Для тяжёлых подходов используй страховочные упоры или страхующего."],
+  "lat-pulldown": ["Подтягивания / верхний блок", "Начни тягу опусканием лопаток; веди локти вниз, а не тяни рукоять кистями.", "Для верхнего блока закрепи бёдра под валиком и возьмись немного шире плеч; в подтягивании выбери устойчивый хват и полный контролируемый вис.; Напряги корпус и слегка подай грудь вверх; не раскачивайся и не запрокидывай голову.; Тяни локти вниз и назад; в блоке веди рукоять к верхней части груди, не за шею.; Медленно выпрями руки вверх, позволяя лопаткам подняться контролируемо; в подтягивании опускайся без падения в плечах.; Ошибки: рывок корпусом, тяга за голову, чрезмерный наклон назад.", "Подтягивания и блок — альтернативы; выбери вариант, где контролируешь весь диапазон."],
+  "split-squat": ["Болгарские выпады", "Подбери расстояние до скамьи так, чтобы передняя стопа оставалась полностью опёртой.", "Поставь заднюю стопу на низкую устойчивую скамью; передняя нога достаточно далеко, чтобы пятка не отрывалась при опускании.; Распредели основную опору на переднюю стопу; корпус слегка наклони вперёд, таз направлен прямо.; Опускайся вертикально вниз, сгибая переднюю ногу; колено следует за носком, заднее колено движется к полу.; Оттолкнись всей передней стопой и вернись вверх; задняя нога помогает сохранять равновесие, но не выталкивает тело.; Выполни подход на одну сторону, затем на другую; используй опору рукой, если нужно для баланса.; Ошибки: слишком короткая стойка, завал колена внутрь, отрыв пятки.", "Начни без веса и поставь скамью ниже колена, если высокая опора мешает устойчивости."],
+  "leg-press": ["Жим ногами", "Не опускай платформу настолько глубоко, чтобы таз округлялся или отрывался от спинки.", "Настрой сиденье и стопы примерно на ширине плеч; поясница и таз прижаты к спинке.; Разблокируй платформу и медленно согни колени, удерживая их по направлению носков.; Остановись до того, как поясница начнёт округляться или таз оторвётся; глубина индивидуальна.; Выжми платформу всей стопой; не защёлкивай колени и не сталкивай колени внутрь.; Ошибки: чрезмерная глубина, отрыв таза, резкое выпрямление коленей.", "До начала подхода проверь фиксаторы тренажёра и способ безопасно вернуть платформу."],
+  "leg-curl": ["Сгибание ног в тренажёре", "Удерживай таз на сиденье или скамье и не бросай вес при разгибании.", "Отрегулируй ось тренажёра около коленного сустава, а валик — чуть выше пятки; зафиксируй бёдра согласно конструкции.; Возьмись за ручки, напряги корпус и прижми таз к опоре.; Согни колени, подтягивая валик к бёдрам; двигайся плавно до комфортного сокращения задней поверхности бедра.; Медленно разогни ноги почти до прямого положения, сохраняя контроль и напряжение.; Ошибки: отрыв таза, рывок, ударное выпрямление коленей.", "Настрой тренажёр под свой рост: неверное положение оси может сделать движение неудобным."],
+  "cable-leg-curl": ["Сгибание ноги в кроссовере с манжетой", "Сгибай колено одной ногой, удерживая бедро и корпус неподвижными.", "Закрепи манжету на нижнем блоке и надёжно зафиксируй её чуть выше голеностопа.; Встань лицом к тренажёру и возьмись за опору; отойди так, чтобы трос натянулся, а корпус оставался вертикальным.; Перенеси вес на опорную ногу, слегка согни её и напряги живот; рабочее бедро держи рядом с опорным.; Согни рабочее колено, приближая пятку к ягодице без движения в тазу и без прогиба поясницы.; Медленно выпрями ногу до комфортного положения, сохраняя натяжение троса; выполни повторы, затем смени ногу.; Ошибки: раскачивать корпус, уводить бедро вперёд, использовать рывок или чрезмерный вес.", "Держись за стойку для равновесия и начни с лёгкого сопротивления; дозируй нагрузку отдельно для каждой ноги."],
+  "lateral-raise": ["Махи гантелями в стороны", "Поднимай руки в плоскости немного впереди корпуса; выбирай небольшой вес.", "Встань устойчиво, гантели у бёдер; локти слегка согнуты, кисти нейтральны.; Напряги живот, опусти плечи от ушей и начни движение руками в стороны.; Поднимай до уровня плеч или ниже, если выше плеч появляется дискомфорт; локоть ведёт движение, кисть не задирай.; Опускай гантели медленнее, чем поднимал; не раскачивай корпус и не используй толчок ногами.; Ошибки: слишком большой вес, пожимание плечами, резкое падение гантелей.", "Для контроля можно выполнять по одной руке, держась свободной рукой за опору."],
+  "biceps-curl": ["Подъём на бицепс со штангой или гантелями", "Сгибай локти без раскачки; плечи остаются возле корпуса.", "Встань ровно, стопы устойчивы; возьмись за штангу или держи гантели по бокам, запястья прямые.; Зафиксируй локти возле корпуса и напряги живот.; Согни руки и подними вес без движения плеч вперёд; не заламывай кисти.; Медленно опусти штангу или гантели почти до полного разгибания локтей.; Ошибки: толчок тазом, отклонение назад, движение только кистями.", "Снизь вес, если приходится раскачиваться или помогать поясницей."],
+  "triceps-pushdown": ["Разгибание рук на блоке", "Плечи и локти остаются почти на месте; двигаются предплечья.", "Встань лицом к верхнему блоку, возьмись за рукоять; корпус устойчивый, локти согнуты и близко к бокам.; Опусти плечи и напряги корпус; не наваливайся весом тела на рукоять.; Разогни локти вниз до комфортного полного разгибания, не запирая их с силой.; Медленно согни локти и верни рукоять, не позволяя плечам уходить вперёд.; Ошибки: раскачивание корпусом, локти разъезжаются, плечи помогают толчком.", "Подбери высоту блока и хват так, чтобы кисти и локти не болели."],
+  "cable-crunch": ["Скручивания на блоке с весом", "Сгибай грудную клетку к тазу; таз и бёдра остаются относительно неподвижными.", "Встань на колени перед верхним блоком; держи канат у висков или плеч, не тяни его руками.; На выдохе мягко округли верх корпуса, направляя рёбра к тазу; движение происходит в туловище.; Внизу на секунду напряги пресс, не садясь ягодицами на пятки и не сгибая бёдра вместо корпуса.; На вдохе медленно вернись, не теряя контроля над весом и не переразгибая поясницу.; Ошибки: тянуть руками, превращать движение в наклон бёдер, использовать слишком тяжёлый вес.", "Если движение вызывает боль в спине, прекрати упражнение и обсуди вариант замены со специалистом."],
+  pallof: ["Pallof press в кроссовере", "Это упражнение на сопротивление вращению: корпус остаётся направленным вперёд.", "Установи рукоять на блоке на уровне груди; встань боком к тренажёру и отойди до лёгкого натяжения троса.; Стопы устойчивы, колени мягкие; держи рукоять у груди и собери корпус.; Выжми руки вперёд, не позволяя тросу повернуть плечи или таз; выдохни в момент выжима.; Верни руки к груди медленно; выполни подход, затем развернись другой стороной.; Ошибки: поворот корпуса вслед за рукоятью, наклон в сторону, слишком большое сопротивление.", "Выбирай сопротивление, при котором можешь полностью остановить вращение корпуса."],
+  "side-plank": ["Боковая планка", "Удерживай голову, корпус и таз на одной линии; не провисай в пояснице.", "Ляг на бок; поставь локоть под плечом, предплечье направь вперёд; ноги выпрями или согни для облегчённого варианта.; Напряги живот и ягодицы, подними таз; плечо не подтягивай к уху.; Дыши спокойно и удерживай прямую линию от головы к коленям или стопам.; Опустись подконтрольно до потери положения, затем повтори на другую сторону.; Ошибки: провисание таза, поворот грудью к полу, задержка дыхания.", "Начни с короткого удержания или согнутых коленей, сохраняя ровное положение."],
+  general: ["Техника упражнения", "Изучай движение с лёгким весом и постепенно добавляй нагрузку только при сохранении контроля.", "Уточни настройку тренажёра и освободи место вокруг.; Прими устойчивое исходное положение и напряги корпус без задержки дыхания.; Выполняй рабочую часть плавно, в амплитуде без боли; возвращай вес под контролем.; Останови подход, если техника распадается, возникает резкая боль, головокружение или онемение.", "Общие подсказки не заменяют очную оценку техники; при травме или боли обратись к квалифицированному специалисту."],
+};
 
-  if (!title) return;
 
-  tasks.push({ title, completed: false });
-  saveTasks();
-  input.value = "";
-  input.focus();
-  renderTasks();
+Object.assign(exerciseHelp, {
+  squat: ["Приседания со штангой", "Стопы примерно на ширине плеч; глубина должна оставаться контролируемой и комфортной.", "Установи гриф на верх спины, симметрично возьмись и сними его со стоек.; Сделай короткие шаги назад и поставь стопы устойчиво.; Сохраняя спину собранной, отведи таз и согни колени; колени направляй по линии носков.; Опустись до доступной глубины без потери равновесия, затем встань, отталкиваясь всей стопой.; Не округляй спину и не допускай резких движений коленей внутрь.", "Осваивай движение с лёгким весом и выставь страховочные упоры."],
+  bench: ["Жим штанги лёжа", "Лопатки и стопы помогают сохранять устойчивое положение на скамье.", "Ляг так, чтобы глаза были под грифом; поставь стопы на пол и сведи лопатки.; Возьмись симметрично чуть шире плеч и сними штангу над грудью.; Плавно опусти гриф к середине груди, сохраняя контроль.; Выжми его вверх и верни на стойки после последнего повтора.; Не отбивай гриф от груди и не теряй устойчивое положение корпуса.", "Работай со страхующим или страховочными упорами."],
+  row: ["Тяга штанги в наклоне", "Сохраняй наклон корпуса и тяни штангу к нижним рёбрам без рывка.", "Поставь стопы устойчиво, слегка согни колени и наклони корпус примерно на 45 градусов.; Возьмись за гриф хватом сверху, напряги корпус и сохрани спину ровной.; Подтяни гриф к нижним рёбрам, ведя локти назад.; Коротко сведи лопатки, затем медленно опусти гриф.; Не выпрямляй корпус рывком и не округляй спину.", "Если поясница устаёт или наклон не удаётся удерживать, используй вариант с опорой грудью."],
+  "romanian-deadlift": ["Румынская тяга со штангой", "Двигай таз назад, сохраняя небольшой сгиб коленей и штангу близко к ногам.", "Встань прямо, держи гриф у бёдер; стопы примерно на ширине плеч, колени слегка согнуты.; Отведи таз назад и опускай гриф вдоль бёдер и голеней.; Остановись, когда почувствуешь натяжение задней поверхности бедра — не округляй спину ради большей глубины.; Вернись в исходное положение, разгибая таз и напрягая ягодицы.; Не превращай движение в присед и не уводи гриф далеко от ног.", "Начни с лёгкого веса и сократи амплитуду, если теряется нейтральное положение спины."],
+  "overhead-press": ["Жим гантелей сидя", "Жми гантели вверх из устойчивого положения, не прогибая чрезмерно поясницу.", "Сядь на скамью, поставь стопы на пол и подними гантели к плечам.; Сохраняй спину собранной, локти согнуты, кисти над локтями.; На выдохе выжми гантели вверх без рывка и не сталкивай их.; На вдохе плавно опусти к плечам.; Не раскачивай корпус и не прогибай поясницу.", "Выбирай безболезненную амплитуду и контролируемый вес."],
+  deadlift: ["Становая тяга классическая", "Держи спину собранной; гриф проходит близко к голеням и бёдрам.", "Поставь стопы примерно на ширине плеч так, чтобы гриф был над серединой стопы.; Отведи таз назад, согни колени и возьмись за гриф; напряги корпус до начала подъёма.; Дави стопами в пол и одновременно разгибай колени и таз, ведя гриф близко к телу.; Встань прямо без отклонения назад.; Опусти гриф подконтрольно, сначала отводя таз, затем сгибая колени.", "Не дёргай штангу с пола; если спина округляется, снизь вес и восстанови стартовую позицию."],
+  "incline-press": ["Жим штанги на наклонной скамье", "Установи наклон около 30° и опускай гриф к верхней части груди.", "Настрой спинку скамьи примерно на 30 градусов; стопы устойчиво на полу, лопатки сведены.; Сними гриф над плечами и опускай его подконтрольно к верхней части груди.; Сделай короткую паузу без отбива и выжми гриф вверх.; Сохраняй положение плеч и таза на скамье; не используй рывок.", "Для тяжёлых подходов используй страхующего или страховочные упоры."],
+  pullup: ["Подтягивания", "Начинай движение со сведения и опускания лопаток; избегай раскачивания.", "Возьмись за перекладину сверху немного шире плеч и повисни, сохраняя контроль плеч.; Напряги корпус и начни подъём, направляя локти вниз.; Поднимись до комфортной верхней точки без рывка и маха ногами.; Медленно опустись в контролируемый вис и повтори.", "Если пока не удаётся выполнять полные повторы, используй тренажёр с противовесом или верхний блок."],
+  "lat-pulldown": ["Тяга верхнего блока к груди", "Закрепи бёдра под валиком и тяни рукоять к верхней части груди, не за голову.", "Сядь, закрепи бёдра под валиком и возьмись за рукоять широким хватом.; Слегка отклони корпус и опусти плечи от ушей.; Подтяни рукоять к верхней части груди, ведя локти вниз и назад.; Верни рукоять вверх медленно, не бросая вес и не запрокидывая голову.", "Снизь вес, если приходится раскачиваться или тянуть рукоять за голову."],
+  "split-squat": ["Болгарские выпады с гантелями", "Основную работу выполняет передняя нога; начни без веса, пока не освоишь баланс.", "Поставь тыльную сторону задней стопы на устойчивую невысокую скамью; переднюю стопу вынеси вперёд на удобное расстояние.; Держи корпус устойчиво и опускайся вниз, сгибая переднюю ногу.; Следи, чтобы передняя стопа не отрывалась, а колено двигалось в направлении носка.; Оттолкнись передней ногой и вернись вверх; сначала закончи повторы на одной ноге, затем на другой.", "Добавляй гантели только после освоения устойчивого движения без веса."],
+  "lateral-raise": ["Махи гантелями в стороны", "Поднимай гантели плавно и не раскачивай корпус.", "Встань устойчиво, слегка согни локти и держи гантели по бокам.; Поднимай руки через стороны примерно до уровня плеч, контролируя движение.; Не пожимай плечами и не помогай себе раскачиванием.; Медленно опусти гантели в исходное положение.", "Выбирай лёгкий вес; остановись раньше, если появляется дискомфорт в плечах."],
+  "biceps-curl": ["Подъём на бицепс", "Держи локти возле корпуса и поднимай вес без раскачки.", "Встань устойчиво и возьми штангу или гантели; запястья держи ровно.; Сохраняй локти рядом с корпусом и сгибай руки, не двигая плечами вперёд.; В верхней точке кратко напряги бицепс.; Медленно опусти вес почти до полного разгибания рук.; Не помогай себе поясницей и не раскачивайся.", "Снизь нагрузку, если не можешь удерживать корпус неподвижно."],
+  "triceps-pushdown": ["Разгибание рук на блоке", "Прижми локти к бокам: движение происходит в локтевом суставе.", "Встань лицом к верхнему блоку и возьмись за рукоять на удобной ширине.; Держи корпус устойчиво, плечи опущены, локти возле боков.; На выдохе разогни руки вниз и коротко задержись.; На вдохе медленно согни локти и верни рукоять.; Не раскачивайся и не отводи локти в стороны.", "Не используй вес, который заставляет наваливаться на рукоять."],
+  "cable-crunch": ["Скручивания на верхнем блоке («молитва»)", "Скручивай туловище, направляя рёбра к тазу; не тяни канат руками.", "Встань на колени перед верхним блоком и возьмись за канат.; Держи руки у головы, а таз относительно неподвижно.; Скругляя корпус, направляй грудную клетку к тазу и вниз.; Плавно вернись в исходное положение.; Не выполняй движение за счёт наклона в тазобедренных суставах или тяги руками.", "Для скручиваний используй умеренный вес и держи шею без напряжения."],
 });
 
-renderTasks();
+function loadData() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey));
+    if (saved && Array.isArray(saved.sessions) && saved.daily && typeof saved.daily === "object") {
+      const loaded = { ...defaultData, ...saved };
+      for (const entry of Object.values(loaded.daily)) if (entry && typeof entry === "object") { delete entry.steps; delete entry.calories; delete entry.protein; }
+      return loaded;
+    }
+  } catch {
+    dataLoadWarning = true;
+    try { corruptStoredData = localStorage.getItem(storageKey); } catch {}
+    return structuredClone(defaultData);
+  }
+  return structuredClone(defaultData);
+}
+
+function saveData() {
+  for (const entry of Object.values(data.daily)) if (entry && typeof entry === "object") { delete entry.steps; delete entry.calories; delete entry.protein; }
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(data));
+    return true;
+  } catch {
+    showToast("Не удалось сохранить данные. Скачайте резервную копию и освободите место в браузере.");
+    return false;
+  }
+}
+
+function completedTrainingCount(sessions = data.sessions) {
+  return sessions.filter((session) => session && session.status !== "partial").length;
+}
+
+function createProgramCycle(sessions = data.sessions, startDate = localDateKey()) {
+  const completed = completedTrainingCount(sessions);
+  return { startDate, completedAtStart: Math.floor(completed / 18) * 18, progressAdjustment: 0 };
+}
+
+function normalizeProgramCycle(cycle, sessions = data.sessions) {
+  const completed = completedTrainingCount(sessions);
+  if (cycle && typeof cycle === "object" && isValidDateKey(cycle.startDate)
+      && cycle.startDate <= localDateKey()
+      && Number.isInteger(cycle.completedAtStart)
+      && cycle.completedAtStart >= 0 && cycle.completedAtStart <= completed) {
+    const progressAdjustment = Number.isInteger(cycle.progressAdjustment)
+      && cycle.progressAdjustment >= -18 && cycle.progressAdjustment <= 18
+      ? cycle.progressAdjustment : 0;
+    return { startDate: cycle.startDate, completedAtStart: cycle.completedAtStart, progressAdjustment };
+  }
+  return createProgramCycle(sessions);
+}
+
+function programCycleProgress() {
+  return Math.max(0, Math.min(18, completedTrainingCount() - data.programCycle.completedAtStart + (data.programCycle.progressAdjustment || 0)));
+}
+
+function normalizeCurrentSession(draft, plans) {
+  if (!draft || !["A", "B"].includes(draft.workout)) return null;
+  const fallbackPlan = plans[draft.workout];
+  const snapshotValid = draft.planSnapshot && Array.isArray(draft.planSnapshot.exercises)
+    && draft.planSnapshot.exercises.length > 0
+    && draft.planSnapshot.exercises.every((exercise) => exercise && typeof exercise.name === "string"
+      && Number.isInteger(Number(exercise.sets)) && Number(exercise.sets) >= 1 && Number(exercise.sets) <= 10
+      && Number.isInteger(Number(exercise.min)) && Number.isInteger(Number(exercise.max))
+      && Number(exercise.min) >= 1 && Number(exercise.max) <= 50 && Number(exercise.min) <= Number(exercise.max)
+      && ["long", "short"].includes(exercise.rest)
+      && (exercise.options === undefined || (Array.isArray(exercise.options) && exercise.options.length > 0 && exercise.options.every((option) => typeof option === "string"))));
+  const plan = snapshotValid ? structuredClone(draft.planSnapshot) : structuredClone(fallbackPlan);
+  if (!plan || !Array.isArray(plan.exercises) || !plan.exercises.length) return null;
+  const savedEntries = Array.isArray(draft.entries) ? draft.entries : [];
+  return {
+    ...draft,
+    planSnapshot: plan,
+    effort: draft.effort ?? "",
+    entries: plan.exercises.map((exercise, index) => {
+      const entry = savedEntries[index] || {};
+      const setCount = Math.max(1, Math.min(10, Number(exercise.sets) || 1));
+      const sets = Array.isArray(entry.sets) ? entry.sets : [];
+      return {
+        optionIndex: Math.max(0, Math.min((exercise.options || [exercise.name]).length - 1, Number(entry.optionIndex) || 0)),
+        completed: Boolean(entry.completed),
+        sets: Array.from({ length: setCount }, (_, setIndex) => ({
+          weight: String(sets[setIndex]?.weight ?? ""),
+          reps: String(sets[setIndex]?.reps ?? ""),
+        })),
+      };
+    }),
+  };
+}
+
+function validateImportedBackup(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !Array.isArray(raw.sessions)
+      || !raw.daily || typeof raw.daily !== "object" || Array.isArray(raw.daily)) {
+    throw new Error("Файл не похож на резервную копию Ритма.");
+  }
+  const plans = raw.plans ? structuredClone(raw.plans) : structuredClone(defaultWorkoutPlans);
+  for (const type of ["A", "B"]) {
+    const plan = plans[type];
+    if (!plan || !Array.isArray(plan.exercises)) throw new Error(`В копии отсутствует план тренировки ${type}.`);
+    for (const exercise of plan.exercises) {
+      if (!exercise || typeof exercise !== "object" || Array.isArray(exercise)) throw new Error("В копии найдено некорректное упражнение.");
+      const sets = Number(exercise.sets), min = Number(exercise.min), max = Number(exercise.max);
+      if (!String(exercise.name || "").trim() || String(exercise.name).length > 80 || !Number.isInteger(sets) || sets < 1 || sets > 10
+          || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max > 50 || min > max
+          || !["long", "short"].includes(exercise.rest)
+          || (exercise.options !== undefined && (!Array.isArray(exercise.options) || !exercise.options.length || exercise.options.some((option) => typeof option !== "string")))
+          || (exercise.helpId !== undefined && !/^[a-z0-9-]+$/i.test(exercise.helpId))) {
+        throw new Error("В копии найдено некорректное упражнение или диапазон повторений.");
+      }
+    }
+  }
+  const exerciseLibrary = raw.exerciseLibrary === undefined
+    ? mergeExerciseLibrary([], plans)
+    : raw.exerciseLibrary;
+  if (!Array.isArray(exerciseLibrary) || exerciseLibrary.length > 1000
+      || exerciseLibrary.some((card) => !card || typeof card !== "object" || Array.isArray(card)
+        || typeof card.id !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(card.id)
+        || typeof card.name !== "string" || !card.name.trim() || card.name.length > 80
+        || (card.summary !== undefined && (typeof card.summary !== "string" || card.summary.length > 180))
+        || (card.steps !== undefined && (typeof card.steps !== "string" || card.steps.length > 700))
+        || (card.helpId !== undefined && (typeof card.helpId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(card.helpId))))) {
+    throw new Error("Каталог упражнений в копии повреждён.");
+  }
+  const exerciseNames = exerciseLibrary.map((card) => exerciseNameKey(card.name));
+  if (new Set(exerciseNames).size !== exerciseNames.length
+      || new Set(exerciseLibrary.map((card) => card.id)).size !== exerciseLibrary.length) {
+    throw new Error("В каталоге копии есть повторяющиеся упражнения.");
+  }
+  if (raw.scheduled !== undefined && (!Array.isArray(raw.scheduled) || raw.scheduled.some((item) => !item
+      || typeof item.id !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(item.id)
+      || !["A", "B"].includes(item.workout) || !isValidDateKey(item.date)))) {
+    throw new Error("Расписание в копии повреждено.");
+  }
+  if (new Set((raw.scheduled || []).map((item) => item.id)).size !== (raw.scheduled || []).length) {
+    throw new Error("В расписании копии есть повторяющиеся идентификаторы.");
+  }
+  if (raw.sessions.some((session) => !session || !["A", "B"].includes(session.workout) || !isValidDateKey(session.date)
+      || (session.completedExercises !== undefined && !Number.isInteger(Number(session.completedExercises)))
+      || (session.totalExercises !== undefined && !Number.isInteger(Number(session.totalExercises)))
+      || !Array.isArray(session.entries)
+      || session.entries.some((entry) => !entry || typeof entry.name !== "string" || !Array.isArray(entry.sets)
+          || entry.sets.some((set) => !set || typeof set !== "object")))) {
+    throw new Error("В копии найдена некорректная запись тренировки.");
+  }
+  for (const [date, entry] of Object.entries(raw.daily)) {
+    if (!isValidDateKey(date) || !entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error("Ежедневные записи в копии повреждены.");
+  }
+  const imported = {
+    ...structuredClone(defaultData),
+    sessions: structuredClone(raw.sessions),
+    daily: structuredClone(raw.daily),
+    scheduled: structuredClone(raw.scheduled || []),
+    plans,
+    exerciseLibrary: mergeExerciseLibrary(exerciseLibrary, plans),
+    planVersion: 2,
+    currentSession: raw.currentSession || null,
+    programCycle: raw.programCycle || null,
+  };
+  imported.currentSession = normalizeCurrentSession(imported.currentSession, plans);
+  imported.programCycle = normalizeProgramCycle(imported.programCycle, imported.sessions);
+  return imported;
+}
+
+function showDialog(id) {
+  const backdrop = document.querySelector(`#${id}`);
+  if (!backdrop) return;
+  dialogReturnFocus.set(backdrop, document.activeElement);
+  backdrop.hidden = false;
+  requestAnimationFrame(() => backdrop.querySelector("button:not(:disabled), input:not([type=hidden]):not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]")?.focus());
+}
+
+function closeDialog(backdrop) {
+  if (!backdrop) return;
+  backdrop.hidden = true;
+  const returnTarget = dialogReturnFocus.get(backdrop);
+  if (returnTarget?.isConnected) returnTarget.focus();
+}
+
+function bindDialogKeyboardControls() {
+  document.addEventListener("keydown", (event) => {
+    const backdrop = [...document.querySelectorAll(".dialog-backdrop:not([hidden])")].at(-1);
+    if (!backdrop) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDialog(backdrop);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = [...backdrop.querySelectorAll("button:not(:disabled), input:not([type=hidden]):not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]")]
+      .filter((element) => element.getClientRects().length);
+    if (!focusable.length) { event.preventDefault(); return; }
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !backdrop.contains(document.activeElement))) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && (document.activeElement === last || !backdrop.contains(document.activeElement))) {
+      event.preventDefault(); first.focus();
+    }
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isValidDateKey(key) {
+  if (typeof key !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+  return localDateKey(dateFromKey(key)) === key;
+}
+
+function dateFromKey(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDate(key, options = { day: "numeric", month: "long" }) {
+  return new Intl.DateTimeFormat("ru-RU", options).format(dateFromKey(key));
+}
+
+function weekStart(date = new Date()) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  return start;
+}
+
+function activeWeekKeys() {
+  const start = weekStart();
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(day.getDate() + index);
+    return localDateKey(day);
+  });
+}
+
+function getNextWorkout() {
+  const completed = programCycleProgress();
+  if (completed >= 18) return null;
+  const week = Math.floor(completed / 3);
+  const sessionInWeek = completed % 3;
+  const sequence = week % 2 === 0 ? ["A", "B", "A"] : ["B", "A", "B"];
+  return sequence[sessionInWeek];
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function renderHeader() {
+  const today = new Date();
+  document.querySelector("#today-label").textContent = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long" }).format(today);
+}
+
+function renderWeekStrip() {
+  const todayKey = localDateKey();
+  const weekKeys = activeWeekKeys();
+  const dayNames = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+  document.querySelector("#week-strip").innerHTML = weekKeys.map((key, index) => {
+    const daySessions = data.sessions.filter((session) => session.date === key);
+    const hasWorkout = daySessions.some((session) => session.status !== "partial");
+    const hasPartial = !hasWorkout && daySessions.some((session) => session.status === "partial");
+    const plannedWorkouts = data.scheduled.filter((item) => item.date === key).map((item) => item.workout);
+    const plannedLabel = plannedWorkouts.length ? `План ${plannedWorkouts.join(" · ")}` : "";
+    const entry = data.daily[key];
+    const hasLog = Boolean(entry && (entry.cardioMinutes || entry.note));
+    return `<div class="week-day ${key === todayKey ? "is-today" : ""} ${hasWorkout ? "has-workout" : hasPartial ? "has-partial" : ""} ${plannedLabel ? "has-planned" : ""}"${plannedLabel ? ` title="${escapeHtml(plannedLabel)} · ${key}"` : ""}><span>${dayNames[index]}</span><strong>${dateFromKey(key).getDate()}</strong>${plannedLabel ? `<small class="week-plan">${escapeHtml(plannedLabel)}</small>` : ""}<i>${hasWorkout ? "●" : hasPartial ? "◐" : hasLog ? "·" : ""}</i></div>`;
+  }).join("");
+}
+
+function renderProgramProgress() {
+  const progress = Math.min(programCycleProgress(), 18);
+  const week = Math.min(Math.floor(progress / 3) + 1, 6);
+  const sessionsThisWeek = progress >= 18 ? 3 : progress % 3;
+  const isComplete = progress >= 18;
+  const label = isComplete ? "Шестинедельный цикл завершён" : `Неделя ${week} из 6 · ${sessionsThisWeek} из 3 тренировок`;
+  document.querySelector("#program-progress").innerHTML = `<div class="program-progress-heading"><div><p class="eyebrow">ТВОЯ ПРОГРАММА</p><strong>${label}</strong></div><span>${progress}/18</span></div><div class="program-progress-track" role="progressbar" aria-label="Прогресс шестинедельной программы" aria-valuemin="0" aria-valuemax="18" aria-valuenow="${progress}"><span style="width:${Math.round(progress / 18 * 100)}%"></span></div><div class="program-progress-footer"><p>${isComplete ? "Все 18 тренировок отмечены. История сохранена — можно начать новый цикл." : `Старт цикла: ${formatDate(data.programCycle.startDate, { day: "numeric", month: "long", year: "numeric" })}`}</p><button type="button" class="secondary-button" id="edit-program">Изменить</button></div>`;
+  document.querySelector("#edit-program").addEventListener("click", openProgramEditor);
+}
+
+function openProgramEditor() {
+  const form = document.querySelector("#program-editor-form");
+  form.elements.startDate.value = data.programCycle.startDate;
+  form.elements.startDate.max = localDateKey();
+  form.elements.progress.value = programCycleProgress();
+  document.querySelector("#program-editor-error").hidden = true;
+  showDialog("program-editor-dialog");
+}
+
+function saveProgramEdit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const error = document.querySelector("#program-editor-error");
+  if (!form.reportValidity()) return;
+  const startDate = String(form.elements.startDate.value);
+  const progress = Number(form.elements.progress.value);
+  if (!isValidDateKey(startDate) || startDate > localDateKey()) {
+    error.textContent = "Укажи корректную дату начала не позднее сегодняшнего дня.";
+    error.hidden = false;
+    return;
+  }
+  if (!Number.isInteger(progress) || progress < 0 || progress > 18) {
+    error.textContent = "Укажи число выполненных тренировок от 0 до 18.";
+    error.hidden = false;
+    return;
+  }
+  const previousCycle = structuredClone(data.programCycle);
+  const completed = completedTrainingCount();
+  data.programCycle = {
+    ...data.programCycle,
+    startDate,
+    completedAtStart: Math.max(0, completed - progress),
+    progressAdjustment: Math.max(0, progress - completed),
+  };
+  if (!saveData()) {
+    data.programCycle = previousCycle;
+    return;
+  }
+  closeDialog(document.querySelector("#program-editor-dialog"));
+  renderOverview();
+  showToast("Параметры программы обновлены");
+}
+
+function renderWorkoutCard() {
+  const draft = data.currentSession;
+  const today = localDateKey();
+  const upcomingSchedule = draft ? null : data.scheduled
+    .filter((item) => item.date >= today)
+    .sort((first, second) => first.date.localeCompare(second.date))[0];
+  const cycleComplete = programCycleProgress() >= 18;
+  const type = draft?.workout || upcomingSchedule?.workout || getNextWorkout();
+  const panel = document.querySelector("#workout-panel");
+  if (!draft && cycleComplete && !upcomingSchedule) {
+    panel.innerHTML = `<div class="program-complete-card"><span class="workout-badge large">✓</span><div><p class="eyebrow">18 ТРЕНИРОВОК ВЫПОЛНЕНО</p><h2>Шестинедельный цикл завершён</h2><p>Все результаты остались в истории. Начни новый цикл, когда будешь готов.</p><button class="primary-button start-workout" id="restart-program" type="button">Начать новый цикл</button></div></div>`;
+    document.querySelector("#restart-program").addEventListener("click", restartProgramCycle);
+    return;
+  }
+  const plan = workoutPlans[type];
+  const preview = plan.exercises.slice(0, 4).map((exercise) => `<li><span>${escapeHtml(exercise.name)}</span><b>${exercise.sets} × ${exercise.min}–${exercise.max}</b></li>`).join("");
+  const remainingCount = plan.exercises.length - 4;
+  const moreExercises = remainingCount > 0 ? `<li class="more-exercises">и ещё ${remainingCount} ${remainingCount === 1 ? "упражнение" : "упражнения"}</li>` : "";
+  const eyebrow = draft ? "ТРЕНИРОВКА В ПРОЦЕССЕ" : upcomingSchedule ? "БЛИЖАЙШАЯ ЗАПЛАНИРОВАННАЯ" : cycleComplete ? "ЗАПЛАНИРОВАННАЯ ТРЕНИРОВКА" : "СЛЕДУЮЩАЯ ПО ПЛАНУ";
+  const scheduledDate = upcomingSchedule ? `<p class="scheduled-next-date">${formatDate(upcomingSchedule.date, { weekday: "long", day: "numeric", month: "long" })}</p>` : "";
+  panel.innerHTML = `<div class="panel-heading"><div><p class="eyebrow">${eyebrow}</p><h2>${escapeHtml(plan.name)}</h2></div><span class="workout-badge">${type}</span></div>${scheduledDate}<p class="panel-description">${escapeHtml(plan.subtitle)}</p><div class="workout-meta"><span>▤ ${plan.exercises.length} упражнений</span><span>◷ около 60–75 мин</span></div><ul class="exercise-preview">${preview}${moreExercises}</ul><button class="primary-button start-workout" id="start-workout" type="button">${draft ? "Продолжить тренировку" : upcomingSchedule ? "Начать запланированную" : "Начать тренировку"}<span>↗</span></button><p class="workout-hint">Между силовыми оставляй 1–2 полных дня отдыха.</p>`;
+  document.querySelector("#start-workout").addEventListener("click", () => startWorkout(upcomingSchedule?.id || ""));
+}
+
+function restartProgramCycle() {
+  const previousCycle = data.programCycle;
+  data.programCycle = { startDate: localDateKey(), completedAtStart: completedTrainingCount(), progressAdjustment: 0 };
+  if (!saveData()) {
+    data.programCycle = previousCycle;
+    return;
+  }
+  renderOverview();
+  showToast("Новый шестинедельный цикл начат");
+}
+
+function renderOverview() {
+  renderHeader();
+  renderWeekStrip();
+  renderProgramProgress();
+  renderWorkoutCard();
+}
+
+function getBodyEntries() {
+  return Object.entries(data.daily)
+    .filter(([, entry]) => Number(entry.weight) > 0 || Number(entry.waist) > 0)
+    .sort(([first], [second]) => first.localeCompare(second));
+}
+
+function changeLabel(current, previous, unit) {
+  if (!current || !previous) return "Пока недостаточно записей для сравнения";
+  const delta = Number(current) - Number(previous);
+  if (Math.abs(delta) < 0.05) return "Без изменений по сравнению с прошлой записью";
+  const sign = delta > 0 ? "+" : "−";
+  return `${sign}${Math.abs(delta).toFixed(1).replace(".", ",")} ${unit} к предыдущей записи`;
+}
+
+function renderMetricChart(entries, field, containerId, unit, label, colorClass) {
+  const metricEntries = entries.filter(([, entry]) => Number(entry[field]) > 0).slice(-14);
+  const container = document.querySelector(`#${containerId}`);
+  const summary = document.querySelector(`#${field === "weight" ? "weight" : "waist"}-trend`);
+  if (!metricEntries.length) {
+    summary.innerHTML = "";
+    container.innerHTML = `<div class="chart-empty"><span>⌁</span><p>Добавь запись ${label.toLocaleLowerCase("ru-RU")}, чтобы увидеть динамику.</p></div>`;
+    return;
+  }
+  const values = metricEntries.map(([, entry]) => Number(entry[field]));
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const padding = Math.max((max - min) * 0.2, field === "weight" ? 0.5 : 1);
+  const low = min - padding;
+  const high = max + padding;
+  const width = 600;
+  const height = 190;
+  const left = 42;
+  const right = 12;
+  const top = 12;
+  const bottom = 28;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const points = metricEntries.map(([date, entry], index) => ({
+    date,
+    value: Number(entry[field]),
+    x: left + (metricEntries.length === 1 ? 0.5 : index / (metricEntries.length - 1)) * plotWidth,
+    y: top + ((high - Number(entry[field])) / (high - low)) * plotHeight,
+  }));
+  const grid = Array.from({ length: 4 }, (_, index) => {
+    const y = top + (index / 3) * plotHeight;
+    const value = high - (index / 3) * (high - low);
+    return `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" class="chart-grid-line"/><text x="${left - 8}" y="${y + 4}" text-anchor="end" class="chart-axis-label">${value.toFixed(1).replace(".", ",")}</text>`;
+  }).join("");
+  const path = points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+  const circles = points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="4" class="chart-point ${colorClass}"><title>${formatDate(point.date)}: ${point.value.toFixed(1).replace(".", ",")} ${unit}</title></circle>`).join("");
+  const singlePointValue = points.length === 1 ? `<text x="${points[0].x}" y="${points[0].y - 12}" text-anchor="middle" class="chart-value-label">${points[0].value.toFixed(1).replace(".", ",")} ${unit}</text>` : "";
+  const first = points[0];
+  const last = points[points.length - 1];
+  const delta = last.value - first.value;
+  const trend = points.length === 1
+    ? "Первый замер · следующая запись покажет изменение"
+    : Math.abs(delta) < 0.05 ? "Без заметных изменений" : `${delta > 0 ? "+" : "−"}${Math.abs(delta).toFixed(1).replace(".", ",")} ${unit} за период`;
+  const dateLabels = points.length === 1
+    ? `<text x="${points[0].x}" y="${height - 5}" text-anchor="middle" class="chart-date-label">${formatDate(first.date, { day: "numeric", month: "short" })}</text>`
+    : `<text x="${left}" y="${height - 5}" class="chart-date-label">${formatDate(first.date, { day: "numeric", month: "short" })}</text><text x="${width - right}" y="${height - 5}" text-anchor="end" class="chart-date-label">${formatDate(last.date, { day: "numeric", month: "short" })}</text>`;
+  summary.innerHTML = `<span class="chart-summary-value ${points.length > 1 && delta < -0.05 ? "trend-down" : points.length > 1 && delta > 0.05 ? "trend-up" : ""}">${trend}</span><span class="chart-summary-period">${points.length > 1 ? `${formatDate(first.date, { day: "numeric", month: "short" })} → ${formatDate(last.date, { day: "numeric", month: "short" })}` : formatDate(first.date, { day: "numeric", month: "short", year: "numeric" })}</span>`;
+  container.innerHTML = `<svg class="weight-chart-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="График ${label.toLocaleLowerCase("ru-RU")} за последние ${metricEntries.length} записей">${grid}${points.length > 1 ? `<path d="${path}" class="chart-line ${colorClass}"/>` : ""}${circles}${singlePointValue}${dateLabels}</svg>`;
+}
+
+function renderBodyMetrics() {
+  const entries = getBodyEntries();
+  const recentWeight = entries.filter(([, entry]) => Number(entry.weight) > 0).slice(-2).reverse();
+  const recentWaist = entries.filter(([, entry]) => Number(entry.waist) > 0).slice(-2).reverse();
+  const currentWeight = recentWeight[0]?.[1].weight;
+  const previousWeight = recentWeight[1]?.[1].weight;
+  const currentWaist = recentWaist[0]?.[1].waist;
+  const previousWaist = recentWaist[1]?.[1].waist;
+  document.querySelector("#body-stats").innerHTML = `<article class="body-stat-card"><span>ПОСЛЕДНИЙ ВЕС</span><strong>${currentWeight ? `${escapeHtml(currentWeight)}<small> кг</small>` : "—"}</strong><p>${currentWeight ? changeLabel(currentWeight, previousWeight, "кг") : "Записей пока нет"}</p></article><article class="body-stat-card"><span>ТАЛИЯ</span><strong>${currentWaist ? `${escapeHtml(currentWaist)}<small> см</small>` : "—"}</strong><p>${currentWaist ? changeLabel(currentWaist, previousWaist, "см") : "Записей пока нет"}</p></article><article class="body-stat-card"><span>ЗАПИСЕЙ С ИЗМЕРЕНИЯМИ</span><strong>${entries.length}</strong><p>Вес или талия</p></article>`;
+  const today = editingBodyDate ? (data.daily[editingBodyDate] || {}) : (data.daily[localDateKey()] || {});
+  const form = document.querySelector("#body-form");
+  form.elements.date.max = localDateKey();
+  if (!editingBodyDate) {
+    form.elements.date.value = localDateKey();
+    form.elements.weight.value = today.weight || "";
+    form.elements.waist.value = today.waist || "";
+  }
+  document.querySelector("#body-form-title").textContent = editingBodyDate ? "Исправить запись" : "Запись за сегодня";
+  document.querySelector("#cancel-body-edit").hidden = !editingBodyDate;
+  form.querySelector(".save-daily").innerHTML = editingBodyDate ? "Сохранить исправления <span>↗</span>" : "Сохранить показатели <span>↗</span>";
+  renderMetricChart(entries, "weight", "weight-chart", "кг", "Вес", "weight-chart-line");
+  renderMetricChart(entries, "waist", "waist-chart", "см", "Талия", "waist-chart-line");
+  const history = document.querySelector("#body-history");
+  const measurementEntries = entries;
+  if (!measurementEntries.length) {
+    history.innerHTML = `<div class="body-history-empty">Измерения появятся здесь после первой записи.</div>`;
+  } else {
+    history.innerHTML = `<div class="measurement-table"><div class="measurement-table-head"><span>Дата</span><span>Вес</span><span>Талия</span><span>Действия</span></div>${[...measurementEntries].reverse().map(([date, entry]) => `<div class="measurement-row"><time>${formatDate(date, { weekday: "short", day: "numeric", month: "short" })}</time><strong>${entry.weight ? `${escapeHtml(entry.weight)} кг` : "—"}</strong><strong>${entry.waist ? `${escapeHtml(entry.waist)} см` : "—"}</strong><div class="measurement-actions"><button class="edit-measurement" type="button" data-edit-body="${date}" aria-label="Изменить измерения за ${formatDate(date)}">Изменить</button><button class="danger-button" type="button" data-delete-body="${date}" aria-label="Удалить измерения за ${formatDate(date)}">Удалить</button></div></div>`).join("")}</div>`;
+    history.querySelectorAll("[data-edit-body]").forEach((button) => button.addEventListener("click", () => {
+      editingBodyDate = button.dataset.editBody;
+      const entry = data.daily[editingBodyDate] || {};
+      form.elements.date.value = editingBodyDate;
+      form.elements.weight.value = entry.weight || "";
+      form.elements.waist.value = entry.waist || "";
+      renderBodyMetrics();
+      form.elements.weight.focus();
+    }));
+    history.querySelectorAll("[data-delete-body]").forEach((button) => button.addEventListener("click", () => {
+      const date = button.dataset.deleteBody;
+      if (!window.confirm(`Удалить запись измерений за ${formatDate(date, { day: "numeric", month: "long", year: "numeric" })}?`)) return;
+      const previousDaily = structuredClone(data.daily);
+      if (data.daily[date]) {
+        delete data.daily[date].weight;
+        delete data.daily[date].waist;
+        if (!Object.keys(data.daily[date]).length) delete data.daily[date];
+      }
+      if (!saveData()) { data.daily = previousDaily; return; }
+      if (editingBodyDate === date) editingBodyDate = null;
+      renderBodyMetrics();
+      renderOverview();
+      showToast("Запись измерений удалена");
+    }));
+  }
+}
+
+function renderPlan() {
+  document.querySelector("#plan-cards").innerHTML = Object.entries(workoutPlans).map(([type, plan]) => `<article class="plan-card"><header class="plan-card-header"><span class="workout-badge">${type}</span><div><h2>${escapeHtml(plan.name)}</h2><p>${escapeHtml(plan.subtitle)}</p></div><button class="secondary-button" data-edit-plan="${type}" type="button">Изменить план</button><span class="exercise-total">${plan.exercises.length} УПРАЖНЕНИЙ</span></header><div class="plan-table"><div class="plan-table-head"><span>Упражнение</span><span>Рабочие подходы</span><span>Отдых</span></div>${plan.exercises.map((exercise) => `<div class="plan-row"><div><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.helpId || "general")}">${escapeHtml(exercise.name)} ⓘ</button>${exercise.options ? `<span class="alternatives">или ${escapeHtml(exercise.options[1])}</span>` : ""}${exercise.sideNote ? `<span class="alternatives">${escapeHtml(exercise.sideNote)}</span>` : ""}</div><b>${exercise.sets} × ${exercise.min}–${exercise.max}</b><span class="rest-cell">${exercise.rest === "long" ? "2–3 мин" : "60–90 сек"}</span></div>`).join("")}</div></article>`).join("");
+  document.querySelectorAll("[data-edit-plan]").forEach((button) => button.addEventListener("click", () => openPlanEditor(button.dataset.editPlan)));
+  bindHelpLinks();
+}
+
+function renderCalendar() {
+  const year = calendarMonth.getFullYear(), month = calendarMonth.getMonth();
+  document.querySelector("#calendar-month").textContent = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(calendarMonth);
+  const first = new Date(year, month, 1), offset = (first.getDay() + 6) % 7;
+  const cells = Math.ceil((offset + new Date(year, month + 1, 0).getDate()) / 7) * 7;
+  document.querySelector("#calendar-grid").innerHTML = Array.from({ length: cells }, (_, i) => {
+    const day = new Date(year, month, i - offset + 1), key = localDateKey(day);
+    const plans = data.scheduled.filter((item) => item.date === key);
+    const daySessions = data.sessions.filter((session) => session.date === key);
+    const done = daySessions.some((session) => session.status !== "partial");
+    const partial = !done && daySessions.some((session) => session.status === "partial");
+    return `<button class="calendar-day ${day.getMonth() !== month ? "outside-month" : ""} ${key === localDateKey() ? "is-today" : ""} ${key === selectedCalendarDate ? "is-selected" : ""}" type="button" data-calendar-date="${key}"><span>${day.getDate()}</span><i>${plans.map((item) => `<b class="workout-dot ${item.workout.toLowerCase()}" title="Запланирована тренировка ${item.workout}">${item.workout}</b>`).join("")}${done ? `<b class="done-dot" title="Тренировка выполнена">✓</b>` : partial ? `<b class="partial-dot" title="Тренировка выполнена частично">◐</b>` : ""}</i></button>`;
+  }).join("");
+  document.querySelectorAll("[data-calendar-date]").forEach((button) => button.addEventListener("click", () => { selectedCalendarDate = button.dataset.calendarDate; renderCalendar(); }));
+  renderSelectedDay();
+}
+
+function renderSelectedDay() {
+  const plans = data.scheduled.filter((item) => item.date === selectedCalendarDate);
+  const canSchedule = selectedCalendarDate >= localDateKey();
+  document.querySelector("#selected-day-panel").innerHTML = `<p class="eyebrow">ВЫБРАННЫЙ ДЕНЬ</p><h2>${formatDate(selectedCalendarDate, { weekday: "long", day: "numeric", month: "long" })}</h2>${plans.length ? plans.map((item) => `<article class="scheduled-card"><span class="workout-badge">${item.workout}</span><strong>Тренировка ${item.workout}</strong><div>${canSchedule ? `<button class="primary-button" type="button" data-start-scheduled="${escapeHtml(item.id)}">Начать</button>` : ""}<button class="secondary-button" type="button" data-edit-scheduled="${escapeHtml(item.id)}">${canSchedule ? "Изменить" : "Перенести"}</button><button class="danger-button" type="button" data-cancel-scheduled="${escapeHtml(item.id)}">Отменить</button></div></article>`).join("") : `<p class="dialog-description">${canSchedule ? "На этот день пока нет тренировок." : "Этот день уже прошёл. Новые тренировки можно планировать только на сегодня или позже."}</p>`}${canSchedule ? `<button class="primary-button" id="schedule-selected" type="button">＋ Запланировать на этот день</button>` : ""}`;
+  document.querySelector("#schedule-selected")?.addEventListener("click", () => openSchedule(selectedCalendarDate));
+  document.querySelectorAll("[data-start-scheduled]").forEach((b) => b.addEventListener("click", () => startWorkout(b.dataset.startScheduled)));
+  document.querySelectorAll("[data-edit-scheduled]").forEach((b) => b.addEventListener("click", () => openSchedule(null, b.dataset.editScheduled)));
+  document.querySelectorAll("[data-cancel-scheduled]").forEach((b) => b.addEventListener("click", () => {
+    if (!window.confirm("Отменить тренировку в расписании?")) return;
+    const previous = data.scheduled; data.scheduled = data.scheduled.filter((item) => item.id !== b.dataset.cancelScheduled); if (!saveData()) { data.scheduled = previous; return; } renderCalendar(); showToast("Тренировка отменена");
+  }));
+}
+
+function openSchedule(date = selectedCalendarDate, id = "") {
+  const form = document.querySelector("#schedule-form"), saved = data.scheduled.find((item) => item.id === id);
+  const today = localDateKey();
+  form.elements.id.value = saved?.id || "";
+  form.elements.date.min = today;
+  form.elements.date.value = saved?.date && saved.date >= today ? saved.date : date >= today ? date : today;
+  form.elements.workout.value = saved?.workout || getNextWorkout() || "A";
+  document.querySelector("#schedule-description").textContent = saved?.date < today
+    ? "Эта дата уже прошла. Выбери новую дату, чтобы перенести тренировку."
+    : "Выбери день и тип занятия. План всегда можно изменить.";
+  document.querySelector("#schedule-error").hidden = true;
+  showDialog("schedule-dialog");
+}
+
+function openPlanEditor(type) {
+  selectedEditorWorkout = type;
+  const form = document.querySelector("#plan-editor-form");
+  form.elements.workout.value = type;
+  document.querySelector("#plan-editor-title").textContent = `Изменить ${workoutPlans[type].name.toLowerCase()}`;
+  document.querySelector("#exercise-library-search").value = "";
+  renderEditorRows(structuredClone(workoutPlans[type].exercises));
+  document.querySelector("#plan-editor-error").hidden = true;
+  document.querySelector("#exercise-library-status").textContent = "";
+  showDialog("plan-editor-dialog");
+}
+
+function editorRowValues() {
+  return [...document.querySelectorAll(".plan-editor-row")].map((row) => Object.fromEntries(
+    ["exerciseId", "sets", "min", "max", "rest"].map((name) => [name, row.querySelector(`[name=${name}]`).value]),
+  ));
+}
+
+function exerciseLibraryCategory(card) {
+  if (card.custom) return "Мои упражнения";
+  if (["lower", "accessory"].includes(card.kind)) return "Ноги";
+  if (card.kind === "upper") return "Верх тела";
+  if (card.kind === "isolation") return "Изоляция и корпус";
+  return "Другие упражнения";
+}
+
+function renderEditorRows(exercises) {
+  const cards = [...data.exerciseLibrary].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const query = exerciseNameKey(document.querySelector("#exercise-library-search").value);
+  document.querySelector("#plan-editor-rows").innerHTML = exercises.map((exercise, index) => {
+    const selected = cards.find((card) => card.id === exercise.exerciseId || card.id === exercise.id)
+      || cards.find((card) => exerciseNameKey(card.name) === exerciseNameKey(exercise.name)
+        && (!exercise.helpId || card.helpId === exercise.helpId));
+    const visibleCards = cards.filter((card) => !query
+      || exerciseNameKey(`${card.name} ${exerciseLibraryCategory(card)}`).includes(query)
+      || card.id === selected?.id);
+    const groups = ["Ноги", "Верх тела", "Изоляция и корпус", "Другие упражнения", "Мои упражнения"].map((category) => {
+      const groupCards = visibleCards.filter((card) => exerciseLibraryCategory(card) === category);
+      return groupCards.length ? `<optgroup label="${category}">${groupCards.map((card) =>
+        `<option value="${escapeHtml(card.id)}" ${selected?.id === card.id ? "selected" : ""}>${escapeHtml(card.name)}</option>`).join("")}</optgroup>` : "";
+    }).join("");
+    const preview = selected?.summary || selected?.steps?.split(/[;.\n]/)[0]?.trim()
+      || exerciseHelp[selected?.helpId]?.[1] || "Подробная справка доступна по значку ⓘ после сохранения плана.";
+    return `<div class="plan-editor-row"><label>Упражнение<select name="exerciseId" required><option value="">Выбери из каталога</option>${groups}</select></label>${selected ? `<p class="exercise-card-preview"><span>${selected.custom ? "МОЯ КАРТОЧКА" : exerciseLibraryCategory(selected).toLocaleUpperCase("ru-RU")}</span>${escapeHtml(preview)}</p>` : ""}<div class="editor-number-fields"><label>Подходы<input name="sets" type="number" min="1" max="10" value="${escapeHtml(exercise.sets ?? 3)}" required /></label><label>От<input name="min" type="number" min="1" max="50" value="${escapeHtml(exercise.min ?? 8)}" required /></label><label>До<input name="max" type="number" min="1" max="50" value="${escapeHtml(exercise.max ?? 12)}" required /></label></div><label>Отдых<select name="rest"><option value="long" ${exercise.rest === "long" ? "selected" : ""}>2–3 минуты</option><option value="short" ${exercise.rest !== "long" ? "selected" : ""}>60–90 секунд</option></select></label><button class="danger-text-button" type="button" data-remove-editor-row="${index}">Удалить упражнение</button></div>`;
+  }).join("");
+  document.querySelectorAll("[data-remove-editor-row]").forEach((button) => button.addEventListener("click", () => {
+    exercises.splice(Number(button.dataset.removeEditorRow), 1);
+    renderEditorRows(exercises);
+  }));
+  document.querySelectorAll('.plan-editor-row select[name="exerciseId"]').forEach((select) => select.addEventListener("change", () => renderEditorRows(editorRowValues())));
+}
+
+function openExerciseHelp(id) {
+  const libraryCard = data.exerciseLibrary.find((card) => card.id === id || card.helpId === id);
+  const h = exerciseHelp[id] || (libraryCard ? [
+    libraryCard.name,
+    libraryCard.summary || "Пользовательская карточка упражнения. Настрой нагрузку под свой уровень и выполняй движение без боли.",
+    libraryCard.steps || "Установи устойчивое исходное положение.; Выполняй движение плавно и контролируй возвращение в исходное положение.; Остановись, если появляется боль или теряется техника.",
+    "Начни с лёгкой нагрузки и увеличивай её постепенно, сохраняя контроль движения.",
+  ] : exerciseHelp.general);
+  const source = {
+    squat: "https://www.championat.com/lifestyle/article-5167991-chto-takoe-olimpijskie-prisedaniya-prisedaniya-so-shtangoj-na-spine.html",
+    bench: "https://www.championat.com/lifestyle/article-4488421-kak-pravilno-delat-bazovye-uprazhneniya-bezopasnaya-tehnika-zhima-lezha-stanovoj-tyagi-prisedanij-so-shtangoj.html",
+    row: "https://www.championat.com/lifestyle/article-5388400-tyaga-shtangi-v-naklone-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html",
+    "romanian-deadlift": "https://www.championat.com/lifestyle/article-5710238-rumynskaya-tyaga-so-shtangoj-tehnika-vypolneniya-kakie-myshcy-rabotayut-kak-pravilno-delat-uprazhnenie.html",
+    "overhead-press": "https://www.championat.com/lifestyle/article-5809758-zhim-gantelej-sidya-tehnika-vypolneniya-kakie-myshcy-rabotayut.html",
+    "triceps-pushdown": "https://www.championat.com/lifestyle/article-4941031-5-luchshih-uprazhnenij-na-triceps-v-trenazhyornom-zale-dlya-muzhchin-ot-trenera.html",
+    "cable-crunch": "https://www.championat.com/lifestyle/article-4602635-molitva-uprazhnenie-na-press-na-trenazhyore-tehnika-vypolneniya-video.html",
+    pallof: "https://bryllim.github.io/workout-guide/exercises/pallof-press/",
+    deadlift: "https://www.championat.com/lifestyle/article-5310910-stanovaya-tyaga-normativy-tehnika-vypolneniya-vidy-stanovoj-tyagi.html",
+    "incline-press": "https://www.championat.com/lifestyle/article-5782466-zhim-shtangi-na-naklonnoj-skame-tehnika-vypolneniya-kakie-myshcy-rabotayut.html",
+    pullup: "https://www.championat.com/lifestyle/article-4201533-kak-nauchitsja-podtjagivatsya-sovety-fitnes-trenera-kompleks-uprazhnenij-s-turnikom-video.html",
+    "lat-pulldown": "https://www.championat.com/lifestyle/article-5404742-tyaga-verhnego-bloka-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html",
+    "split-squat": "https://www.championat.com/lifestyle/article-5138357-bolgarskie-vypady-pravilnaya-tehnika-i-glavnye-oshibki.html",
+    "cable-leg-curl": "https://www.championat.com/lifestyle/article-5073789-kak-nakachat-zadnyuyu-poverhnost-bedra-top-11-uprazhnenij-dlya-uprugoj-i-silnoj-zadnej-poverhnosti-bedra.html",
+    "lateral-raise": "https://www.championat.com/lifestyle/article-5774694-mahi-gantelyami-v-storonu-kak-pravilno-delat-stoya-sidya-v-naklone-tehnika-vypolneniya.html",
+    "biceps-curl": "https://www.championat.com/lifestyle/article-4933279-4-luchshih-uprazhneniya-na-biceps-dlya-muzhchin-v-trenazhernom-zale.html",
+  };
+  const sourceLink = document.querySelector("#exercise-source");
+  sourceLink.hidden = Boolean(libraryCard?.custom);
+  sourceLink.href = source[id] || "https://www.championat.com/articles/lifestyle/1.html";
+  sourceLink.textContent = source[id]?.includes("championat.com") ? "Источник: Чемпионат ↗" : source[id] ? "Источник упражнения ↗" : "Открыть раздел тренировок Чемпионата ↗";
+  document.querySelector("#exercise-dialog-title").textContent = h[0];
+  document.querySelector("#exercise-dialog-summary").textContent = h[1];
+  document.querySelector("#exercise-steps").innerHTML = h[2].split(/;\s*|\n+/).map((x) => x.trim()).filter(Boolean)
+    .map((x) => `<li>${escapeHtml(x.charAt(0).toLocaleUpperCase("ru-RU") + x.slice(1))}</li>`).join("");
+  document.querySelector("#exercise-cue").textContent = h[3];
+  const image = exerciseImages[id];
+  const imageWrap = document.querySelector("#exercise-image-wrap");
+  const exerciseImage = document.querySelector("#exercise-image");
+  const imageCredit = document.querySelector("#exercise-image-credit");
+  imageWrap.hidden = false;
+  if (image) {
+    imageWrap.classList.remove("is-unavailable");
+    imageWrap.classList.toggle("is-pullup-photo", id === "pullup");
+    imageWrap.classList.toggle("is-pallof-sequence", id === "pallof");
+    exerciseImage.hidden = false;
+    exerciseImage.src = `images/exercises/${image[0].includes("/") ? image[0] : `open-source/${image[0]}`}`;
+    exerciseImage.alt = `Иллюстрация: ${h[0]}`;
+    const imageCreditHtml = image[5]
+      ? `<a href="${escapeHtml(image[5])}" target="_blank" rel="noreferrer">${escapeHtml(image[1])} · ${escapeHtml(image[2])} · источник ↗</a>`
+      : `<a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(image[3]).replaceAll("%20", "_")}" target="_blank" rel="noreferrer">${escapeHtml(image[3].replaceAll("_", " "))} · ${escapeHtml(image[1])} · ${escapeHtml(image[2])} · страница файла ↗</a>`;
+    imageCredit.innerHTML = `${escapeHtml(image[4] ? image[4] + " " : "")}${imageCreditHtml}`;
+  } else {
+    imageWrap.classList.add("is-unavailable");
+    exerciseImage.hidden = true;
+    exerciseImage.removeAttribute("src");
+    exerciseImage.alt = "";
+    imageCredit.textContent = "Иллюстрация для этого упражнения пока не добавлена.";
+  }
+  showDialog("exercise-dialog");
+}
+function bindHelpLinks() { document.querySelectorAll("[data-help]").forEach((b) => b.addEventListener("click", () => openExerciseHelp(b.dataset.help))); }
+
+function startWorkout(scheduleId = "") {
+  if (!data.currentSession) {
+    const scheduled = data.scheduled.find((item) => item.id === scheduleId);
+    const previousCycle = data.programCycle;
+    if (programCycleProgress() >= 18) {
+      data.programCycle = { startDate: localDateKey(), completedAtStart: completedTrainingCount(), progressAdjustment: 0 };
+    }
+    const workout = scheduled?.workout || getNextWorkout() || "A";
+    const plan = structuredClone(workoutPlans[workout]);
+    data.currentSession = {
+      id: `session-${Date.now()}`,
+      workout,
+      planSnapshot: plan,
+      date: scheduled?.date || localDateKey(),
+      scheduleId: scheduled?.id || "",
+      startedAt: new Date().toISOString(),
+      effort: "",
+      entries: plan.exercises.map((exercise) => ({
+        optionIndex: 0,
+        completed: false,
+        sets: Array.from({ length: exercise.sets }, () => ({ weight: "", reps: "" })),
+      })),
+    };
+    if (!saveData()) {
+      data.currentSession = null;
+      data.programCycle = previousCycle;
+      return;
+    }
+  }
+  showView("session");
+  renderSession();
+  window.scrollTo(0, 0);
+}
+
+function lastExerciseEntry(exerciseName) {
+  for (const session of [...data.sessions].reverse()) {
+    const match = session.entries.find((entry) => entry.name === exerciseName && (session.status !== "partial" || entry.completed));
+    if (match) return match;
+  }
+  return null;
+}
+
+function progressionHint(exercise, name) {
+  const last = lastExerciseEntry(name);
+  if (!last || !last.sets?.length) return "Запиши первый результат — он станет точкой отсчёта.";
+  const reachedTop = last.sets.every((set) => Number(set.reps) >= exercise.max);
+  if (!reachedTop) return `В прошлый раз: ${last.sets.map((set) => `${set.weight || "—"} кг × ${set.reps || "—"}`).join(" · ")}. Сначала постарайся достичь верхней границы во всех подходах.`;
+  const step = exercise.kind === "lower" ? "+5 кг" : exercise.kind === "upper" ? "+2–2,5 кг" : "минимальный доступный шаг";
+  return `В прошлый раз верхняя граница выполнена во всех подходах. По плану можно рассмотреть прибавку: ${step}.`;
+}
+
+function renderSession() {
+  const draft = data.currentSession;
+  if (!draft) return showView("overview");
+  const plan = draft.planSnapshot || workoutPlans[draft.workout];
+  document.querySelector("#session-date").textContent = formatDate(draft.date, { day: "numeric", month: "long", year: "numeric" });
+  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><div class="warmup-card"><span>↗</span><p><strong>Разминка</strong> · 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></div><div class="session-tools"><span>Записывай рабочие веса и повторения. Таймер подаст звуковой сигнал.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button">◷ <span id="timer-label">Запустить отдых</span></button></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
+  bindSessionEvents();
+}
+
+function renderExercise(exercise, index, entry) {
+  const alternatives = exercise.options || [exercise.name];
+  const name = alternatives[entry.optionIndex] || alternatives[0];
+  const sets = entry.sets;
+  const completed = Boolean(entry.completed);
+  const loggedSets = sets.filter((set) => String(set.reps).trim() !== "").length;
+  const progress = sets.length ? Math.round((loggedSets / sets.length) * 100) : 0;
+  const firstOpenSet = sets.findIndex((set) => String(set.reps).trim() === "");
+  const setRows = sets.map((set, setIndex) => {
+    const logged = String(set.reps).trim() !== "";
+    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><label class="visually-hidden" for="weight-${index}-${setIndex}">Вес, килограммы, подход ${setIndex + 1}</label><label class="set-field"><span>Вес, кг</span><input id="weight-${index}-${setIndex}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /></label><label class="visually-hidden" for="reps-${index}-${setIndex}">Повторения, подход ${setIndex + 1}</label><label class="set-field"><span>Повторы</span><input id="reps-${index}-${setIndex}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /></label><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
+  }).join("");
+  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
+}
+
+function bindSessionEvents() {
+  bindHelpLinks();
+  const timerPreset = document.querySelector("#timer-preset");
+  timerPreset.value = timerPresetSeconds;
+  timerPreset.addEventListener("change", () => { timerPresetManuallyChanged = true; timerPresetSeconds = timerPreset.value; });
+  document.querySelectorAll("[data-set-field]").forEach((input) => input.addEventListener("input", () => {
+    const exerciseIndex = Number(input.dataset.exercise);
+    const setIndex = Number(input.dataset.set);
+    const field = input.dataset.setField;
+    data.currentSession.entries[exerciseIndex].sets[setIndex][field] = input.value;
+    saveData();
+    const card = input.closest(".exercise-card");
+    const setRows = [...card.querySelectorAll(".set-row")];
+    const firstOpenSet = setRows.findIndex((row) => !row.querySelector('[data-set-field="reps"]').value.trim());
+    let loggedSets = 0;
+    setRows.forEach((row, index) => {
+      const reps = row.querySelector('[data-set-field="reps"]').value.trim();
+      const logged = reps !== "";
+      if (logged) loggedSets += 1;
+      row.classList.toggle("is-set-complete", logged);
+      row.classList.toggle("is-next-set", index === firstOpenSet);
+      const check = row.querySelector(".set-check");
+      check.textContent = logged ? "✓" : "·";
+      check.setAttribute("aria-label", logged ? "Подход записан" : "Подход ещё не записан");
+    });
+    const count = card.querySelector(".exercise-log-count");
+    const bar = card.querySelector('[role="progressbar"]');
+    const totalSets = setRows.length;
+    count.textContent = `${loggedSets} из ${totalSets} подходов записано`;
+    bar.setAttribute("aria-valuenow", String(loggedSets));
+    bar.firstElementChild.style.width = `${totalSets ? Math.round((loggedSets / totalSets) * 100) : 0}%`;
+  }));
+  document.querySelectorAll("[data-variant]").forEach((select) => select.addEventListener("change", () => {
+    data.currentSession.entries[Number(select.dataset.variant)].optionIndex = Number(select.value);
+    saveData();
+    renderSession();
+  }));
+  document.querySelector("#effort-input").addEventListener("input", (event) => {
+    data.currentSession.effort = event.target.value;
+    document.querySelector("#effort-value").textContent = `${event.target.value}/10`;
+    saveData();
+  });
+  document.querySelectorAll("[data-toggle-exercise]").forEach((button) => button.addEventListener("click", () => {
+    const index = Number(button.dataset.toggleExercise);
+    const entry = data.currentSession.entries[index];
+    entry.completed = !entry.completed;
+    const card = button.closest(".exercise-card");
+    card.classList.toggle("exercise-completed", entry.completed);
+    button.setAttribute("aria-pressed", String(entry.completed));
+    button.textContent = entry.completed ? "✓ Выполнено" : "Отметить";
+    saveData();
+  }));
+  document.querySelectorAll(".inline-timer").forEach((button) => button.addEventListener("click", () => {
+    if (restTimer.activeButton === button && restTimer.interval) stopTimer();
+    else startTimer(button.dataset.rest, button);
+  }));
+  document.querySelector("#timer-button").addEventListener("click", () => restTimer.interval ? stopTimer() : startTimer("long"));
+  document.querySelector("#finish-workout").addEventListener("click", requestFinishWorkout);
+  document.querySelector("#cancel-workout").addEventListener("click", cancelCurrentWorkout);
+  document.querySelector("#save-partial-workout").addEventListener("click", () => {
+    closeDialog(document.querySelector("#finish-dialog"));
+    finishWorkout(true);
+  });
+}
+
+function stopTimer() {
+  clearInterval(restTimer.interval);
+  restTimer.interval = null;
+  if (restTimer.activeButton) restTimer.activeButton.textContent = "Запустить отдых";
+  restTimer.activeButton = null;
+  const label = document.querySelector("#timer-label");
+  if (label) label.textContent = "Запустить отдых";
+  document.querySelector("#timer-button")?.classList.remove("timer-running");
+}
+function startTimer(restType, sourceButton = null) {
+  clearInterval(restTimer.interval);
+  if (restTimer.activeButton) restTimer.activeButton.textContent = "Запустить отдых";
+  restTimer.activeButton = sourceButton;
+  const preset = document.querySelector("#timer-preset");
+  if (!timerPresetManuallyChanged) preset.value = restType === "short" ? "75" : "150";
+  timerPresetSeconds = preset.value;
+  restTimer.remaining = Number(preset.value);
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (AudioContextClass && !timerAudioContext) timerAudioContext = new AudioContextClass();
+  timerAudioContext?.resume().catch(() => {});
+  const label = document.querySelector("#timer-label");
+  document.querySelector("#timer-button").classList.add("timer-running");
+  const tick = () => {
+    const minutes = String(Math.floor(restTimer.remaining / 60)).padStart(2, "0");
+    const seconds = String(restTimer.remaining % 60).padStart(2, "0");
+    if (label) label.textContent = `${minutes}:${seconds} · остановить`;
+    if (restTimer.activeButton) restTimer.activeButton.textContent = `${minutes}:${seconds} · стоп`;
+    if (restTimer.remaining <= 0) {
+      clearInterval(restTimer.interval);
+      restTimer.interval = null;
+      document.querySelector("#timer-button").classList.remove("timer-running");
+      if (restTimer.activeButton) {
+        restTimer.activeButton.textContent = "Отдых завершён · снова";
+        restTimer.activeButton = null;
+      }
+      if (label) label.textContent = "Отдых завершён · повторить";
+      playTimerSignal();
+      showToast("Время отдыха закончилось");
+        return;
+    }
+    restTimer.remaining -= 1;
+  };
+  tick();
+  restTimer.interval = setInterval(tick, 1000);
+}
+
+function playTimerSignal() {
+  if (!timerAudioContext) return;
+  const now = timerAudioContext.currentTime;
+  [0, 0.24, 0.48].forEach((offset) => {
+    const oscillator = timerAudioContext.createOscillator();
+    const gain = timerAudioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = offset === 0.24 ? 660 : 880;
+    gain.gain.setValueAtTime(0.0001, now + offset);
+    gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.18);
+    oscillator.connect(gain); gain.connect(timerAudioContext.destination);
+    oscillator.start(now + offset); oscillator.stop(now + offset + 0.19);
+  });
+}
+
+function cancelCurrentWorkout() {
+  const draft = data.currentSession;
+  if (!draft) return;
+  if (!window.confirm("Отменить тренировку? Введённые результаты будут удалены, а запись в календаре останется.")) return;
+  data.currentSession = null;
+  if (!saveData()) {
+    data.currentSession = draft;
+    return;
+  }
+  stopTimer();
+  showView("overview");
+  renderOverview();
+  showToast("Тренировка отменена. Её можно начать позже из календаря.");
+}
+function requestFinishWorkout() {
+  const draft = data.currentSession;
+  const total = draft.entries.length;
+  const completed = draft.entries.filter((entry) => entry.completed).length;
+  if (!total) {
+    showToast("В этом плане нет упражнений. Добавь хотя бы одно перед тренировкой.");
+    return;
+  }
+  if (completed < total) {
+    document.querySelector("#finish-summary").textContent = `Отмечено ${completed} из ${total} упражнений. Сохранить занятие как неполное? Оно не войдёт в счётчик выполненных тренировок, а план А/Б не переключится.`;
+    showDialog("finish-dialog");
+    return;
+  }
+  finishWorkout(false);
+}
+
+function finishWorkout(partial = false) {
+  const draft = data.currentSession;
+  const plan = draft.planSnapshot || workoutPlans[draft.workout];
+  const { planSnapshot, ...sessionRecord } = draft;
+  const record = {
+    ...sessionRecord,
+    status: partial ? "partial" : "completed",
+    completedExercises: draft.entries.filter((entry) => entry.completed).length,
+    totalExercises: draft.entries.length,
+    finishedAt: new Date().toISOString(),
+    entries: draft.entries.map((entry, index) => ({
+      name: (plan.exercises[index].options || [plan.exercises[index].name])[entry.optionIndex],
+      completed: Boolean(entry.completed),
+      sets: entry.sets.map((set) => ({ weight: set.weight, reps: set.reps })),
+    })),
+  };
+  data.sessions.push(record);
+  data.currentSession = null;
+  const previousScheduled = data.scheduled;
+  if (!partial && draft.scheduleId) {
+    data.scheduled = data.scheduled.filter((item) => item.id !== draft.scheduleId);
+  }
+  if (!saveData()) {
+    data.sessions.pop();
+    data.currentSession = draft;
+    data.scheduled = previousScheduled;
+    return;
+  }
+  stopTimer();
+  closeDialog(document.querySelector("#finish-dialog"));
+  showView("overview");
+  renderOverview();
+  showToast(partial ? "Неполная тренировка сохранена" : "Тренировка сохранена в истории");
+  window.scrollTo(0, 0);
+}
+
+function openSessionEditor(id) {
+  const session = data.sessions.find((item) => item.id === id);
+  if (!session) return;
+  editingSessionId = id;
+  const form = document.querySelector("#session-editor-form");
+  form.elements.date.value = session.date;
+  form.elements.effort.value = session.effort || "";
+  document.querySelector("#session-editor-error").hidden = true;
+  document.querySelector("#session-editor-entries").innerHTML = session.entries.map((entry, entryIndex) => `
+    <article class="session-edit-exercise">
+      <div class="session-edit-heading"><h3>${escapeHtml(entry.name)}</h3><label><input type="checkbox" data-session-completed="${entryIndex}" ${entry.completed ? "checked" : ""} /> Выполнено</label></div>
+      ${entry.sets.map((set, setIndex) => `<div class="session-edit-set"><span>Подход ${setIndex + 1}</span><label>Вес, кг<input type="number" min="0" step="0.5" value="${escapeHtml(set.weight || "")}" data-session-weight="${entryIndex}-${setIndex}" /></label><label>Повторы<input type="number" min="0" max="100" step="1" value="${escapeHtml(set.reps || "")}" data-session-reps="${entryIndex}-${setIndex}" /></label></div>`).join("")}
+    </article>`).join("");
+  showDialog("session-editor-dialog");
+}
+
+function deleteSessionFromHistory(id) {
+  const index = data.sessions.findIndex((session) => session.id === id);
+  if (index < 0) return;
+  const session = data.sessions[index];
+  const date = formatDate(session.date, { day: "numeric", month: "long", year: "numeric" });
+  if (!window.confirm(`Удалить тренировку от ${date} из истории? Это действие нельзя отменить.`)) return;
+  const previousCycle = structuredClone(data.programCycle);
+  data.sessions.splice(index, 1);
+  data.programCycle = normalizeProgramCycle(data.programCycle, data.sessions);
+  if (!saveData()) {
+    data.sessions.splice(index, 0, session);
+    data.programCycle = previousCycle;
+    return;
+  }
+  renderHistory();
+  renderCalendar();
+  renderOverview();
+  showToast("Тренировка удалена из истории");
+}
+
+function formatWorkoutReport(session) {
+  const workoutName = workoutPlans[session.workout]?.name || `Тренировка ${session.workout}`;
+  const status = session.status === "partial"
+    ? `Частично выполнена (${session.completedExercises ?? session.entries.filter((entry) => entry.completed).length}/${session.totalExercises ?? session.entries.length} упражнений)`
+    : "Завершена";
+  const lines = [
+    "Отчёт о тренировке для ИИ-тренера",
+    `Дата: ${formatDate(session.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
+    `План: ${workoutName}`,
+    `Статус: ${status}`,
+    `Общая тяжесть: ${session.effort ? `${session.effort}/10` : "не оценена"}`,
+    "",
+    "Упражнения и рабочие подходы:",
+  ];
+  session.entries.forEach((entry, index) => {
+    lines.push(`${index + 1}. ${entry.name}${entry.completed ? " — выполнено" : " — не отмечено как выполненное"}`);
+    const recordedSets = (entry.sets || []).filter((set) => String(set.weight || "").trim() || String(set.reps || "").trim());
+    if (!recordedSets.length) {
+      lines.push("   Подходы не записаны");
+      return;
+    }
+    recordedSets.forEach((set, setIndex) => {
+      const weight = String(set.weight || "").trim() ? `${set.weight} кг` : "вес не указан";
+      const reps = String(set.reps || "").trim() ? `${set.reps} повт.` : "повторы не указаны";
+      lines.push(`   ${setIndex + 1}) ${weight} × ${reps}`);
+    });
+  });
+  lines.push("", "Проанализируй выполнение плана и нагрузку. Отметь прогресс, если его можно подтвердить этими данными, и подскажи, что отслеживать на следующей тренировке. Не додумывай отсутствующие результаты.");
+  return lines.join("\n");
+}
+
+async function copyWorkoutReport(id) {
+  const session = data.sessions.find((item) => item.id === id);
+  if (!session) { showToast("Не удалось найти эту тренировку"); return; }
+  const report = formatWorkoutReport(session);
+  try {
+    if (window.AndroidBackup?.copy) {
+      window.AndroidBackup.copy(report);
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(report);
+    } else {
+      const field = document.createElement("textarea");
+      field.value = report;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.append(field);
+      field.select();
+      const copied = document.execCommand("copy");
+      field.remove();
+      if (!copied) throw new Error("clipboard unavailable");
+    }
+    showToast("Отчёт скопирован. Вставь его в диалог с ИИ-тренером.");
+  } catch {
+    showToast("Не удалось скопировать отчёт. Попробуй открыть приложение в браузере и повторить.");
+  }
+}
+
+function saveSessionEdit(event) {
+  event.preventDefault();
+  const session = data.sessions.find((item) => item.id === editingSessionId);
+  const form = event.currentTarget;
+  const error = document.querySelector("#session-editor-error");
+  if (!session) { error.textContent = "Не удалось найти эту тренировку в истории."; error.hidden = false; return; }
+  if (!form.reportValidity()) return;
+  const values = new FormData(form);
+  const effort = String(values.get("effort") || "");
+  if (effort && (!Number.isInteger(Number(effort)) || Number(effort) < 1 || Number(effort) > 10)) {
+    error.textContent = "Укажи тяжесть от 1 до 10 или оставь поле пустым."; error.hidden = false; return;
+  }
+  const previous = structuredClone(session);
+  session.date = String(values.get("date"));
+  session.effort = effort;
+  session.entries.forEach((entry, entryIndex) => {
+    entry.completed = Boolean(form.querySelector(`[data-session-completed="${entryIndex}"]`)?.checked);
+    entry.sets = entry.sets.map((set, setIndex) => ({
+      weight: form.querySelector(`[data-session-weight="${entryIndex}-${setIndex}"]`).value,
+      reps: form.querySelector(`[data-session-reps="${entryIndex}-${setIndex}"]`).value,
+    }));
+  });
+  session.completedExercises = session.entries.filter((entry) => entry.completed).length;
+  session.totalExercises = session.entries.length;
+  session.status = session.completedExercises === session.totalExercises ? "completed" : "partial";
+  if (!saveData()) {
+    Object.assign(session, previous);
+    return;
+  }
+  editingSessionId = null;
+  closeDialog(document.querySelector("#session-editor-dialog"));
+  renderHistory();
+  renderCalendar();
+  renderOverview();
+  showToast("Запись тренировки исправлена");
+}
+
+function renderHistory() {
+  const content = document.querySelector("#history-content");
+  if (selectedHistory === "workouts") {
+    if (!data.sessions.length) {
+      content.innerHTML = `<div class="empty-state"><span>◷</span><h2>Пока нет завершённых тренировок</h2><p>После первой силовой здесь появится история подходов и рабочих весов.</p></div>`;
+      return;
+    }
+    content.innerHTML = `<div class="history-list">${[...data.sessions].sort((a, b) => b.date.localeCompare(a.date) || String(b.finishedAt || "").localeCompare(String(a.finishedAt || ""))).map((session) => `<article class="history-card"><header><span class="workout-badge">${session.workout}</span><div><h3>${escapeHtml(workoutPlans[session.workout].name)}</h3><p>${formatDate(session.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p></div><span class="history-effort">Тяжесть ${escapeHtml(session.effort || "—")}/10</span><span class="history-status ${session.status === "partial" ? "is-partial" : ""}">${session.status === "partial" ? `Неполная · ${escapeHtml(session.completedExercises || 0)}/${escapeHtml(session.totalExercises || session.entries.length)}` : "Завершена"}</span><div class="history-actions"><button type="button" class="edit-session-button" data-edit-session="${escapeHtml(session.id)}">Изменить</button><button type="button" class="danger-button delete-session-button" data-delete-session="${escapeHtml(session.id)}">Удалить</button></div></header><div class="history-exercises">${session.entries.map((entry) => `<div class="${entry.completed ? "history-exercise-done" : ""}"><strong>${entry.completed ? "✓ " : ""}${escapeHtml(entry.name)}</strong><span>${entry.sets.map((set) => `${escapeHtml(set.weight || "—")} кг × ${escapeHtml(set.reps || "—")}`).join(" · ")}</span></div>`).join("")}</div><div class="history-share-row"><button class="secondary-button" type="button" data-copy-workout-report="${escapeHtml(session.id)}">Скопировать отчёт для ИИ-тренера</button></div></article>`).join("")}</div>`;
+    content.querySelectorAll("[data-edit-session]").forEach((button) => button.addEventListener("click", () => openSessionEditor(button.dataset.editSession)));
+    content.querySelectorAll("[data-delete-session]").forEach((button) => button.addEventListener("click", () => deleteSessionFromHistory(button.dataset.deleteSession)));
+    content.querySelectorAll("[data-copy-workout-report]").forEach((button) => button.addEventListener("click", () => copyWorkoutReport(button.dataset.copyWorkoutReport)));
+    return;
+  }
+  const entries = Object.entries(data.daily)
+    .filter(([, entry]) => entry.cardioMinutes || entry.note)
+    .sort(([first], [second]) => second.localeCompare(first));
+  if (!entries.length) {
+    content.innerHTML = `<div class="empty-state"><span>⌖</span><h2>Ежедневных записей пока нет</h2><p>Отмечай кардио или заметки на главной странице.</p></div>`;
+    return;
+  }
+  content.innerHTML = `<div class="daily-history">${entries.map(([key, entry]) => `<article class="daily-history-row"><time>${formatDate(key, { weekday: "short", day: "numeric", month: "short" })}</time><div class="daily-history-values">${entry.cardioMinutes ? `<span><b>${escapeHtml(entry.cardioMinutes)}</b> мин · ${escapeHtml(activityName(entry.activity))}</span>` : ""}</div>${entry.note ? `<p>${escapeHtml(entry.note)}</p>` : ""}<button type="button" class="delete-log" data-delete-log="${key}" aria-label="Удалить ежедневную запись за ${key}">×</button></article>`).join("")}</div>`;
+  content.querySelectorAll("[data-delete-log]").forEach((button) => button.addEventListener("click", () => {
+    if (!window.confirm("Удалить ежедневную запись? Показатели веса и талии сохранятся.")) return;
+    const entry = data.daily[button.dataset.deleteLog];
+    for (const field of ["cardioMinutes", "activity", "note"]) delete entry[field];
+    if (!entry.weight && !entry.waist) delete data.daily[button.dataset.deleteLog];
+    saveData();
+    renderHistory();
+    renderOverview();
+    renderBodyMetrics();
+  }));
+}
+
+function activityName(value) {
+  return ({ walk: "кардио", basketball: "баскетбол", bike: "велосипед", elliptical: "эллипс" })[value] || "кардио";
+}
+
+function showView(view) {
+  document.querySelectorAll(".view").forEach((element) => element.classList.toggle("active", element.id === `view-${view}`));
+  document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+  if (view === "history") renderHistory();
+}
+
+function showToast(message) {
+  const toast = document.querySelector("#toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  window.setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function bindEvents() {
+  document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => {
+    const view = button.dataset.view;
+    if (view !== "session" && data.currentSession && restTimer.interval) stopTimer();
+    showView(view);
+    if (view === "overview") renderOverview();
+    if (view === "plan") renderPlan();
+    if (view === "calendar") renderCalendar();
+    if (view === "body") renderBodyMetrics();
+  }));
+  document.querySelector("#back-overview").addEventListener("click", () => {
+    stopTimer();
+    showView("overview");
+    renderOverview();
+  });
+  document.querySelector("#today-button").addEventListener("click", () => {
+    calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    selectedCalendarDate = localDateKey();
+    showView("calendar");
+    renderCalendar();
+    window.scrollTo(0, 0);
+  });
+  document.querySelector("#session-editor-form").addEventListener("submit", saveSessionEdit);
+  document.querySelector("#cancel-session-edit").addEventListener("click", () => { editingSessionId = null; });
+  document.querySelector("#program-editor-form").addEventListener("submit", saveProgramEdit);
+  document.querySelector("#add-schedule").addEventListener("click", () => openSchedule());
+  document.querySelector("#calendar-prev").addEventListener("click", () => { calendarMonth.setMonth(calendarMonth.getMonth() - 1); renderCalendar(); });
+  document.querySelector("#calendar-next").addEventListener("click", () => { calendarMonth.setMonth(calendarMonth.getMonth() + 1); renderCalendar(); });
+  document.querySelector("#calendar-today").addEventListener("click", () => { calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); selectedCalendarDate = localDateKey(); renderCalendar(); });
+  document.querySelector("#schedule-form").addEventListener("submit", (event) => {
+    event.preventDefault(); const form = event.currentTarget, values = Object.fromEntries(new FormData(form));
+    const error = document.querySelector("#schedule-error");
+    if (!isValidDateKey(values.date) || values.date < localDateKey()) {
+      error.textContent = "Нельзя запланировать тренировку на прошедшую дату. Выбери сегодня или более поздний день.";
+      error.hidden = false;
+      return;
+    }
+    const item = { id: values.id || `plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, date: values.date, workout: values.workout };
+    const previousScheduled = data.scheduled;
+    data.scheduled = data.scheduled.filter((x) => x.id !== item.id); data.scheduled.push(item); selectedCalendarDate = item.date; calendarMonth = new Date(dateFromKey(item.date).getFullYear(), dateFromKey(item.date).getMonth(), 1);
+    if (!saveData()) { data.scheduled = previousScheduled; return; }
+    closeDialog(document.querySelector("#schedule-dialog")); renderCalendar();
+  });
+  document.querySelectorAll("[data-close-dialog]").forEach((b) => b.addEventListener("click", () => closeDialog(document.querySelector(`#${b.dataset.closeDialog}`))));
+  bindDialogKeyboardControls();
+  document.querySelector("#add-exercise").addEventListener("click", () => {
+    const rows = editorRowValues();
+    rows.push({ exerciseId: "", sets: 3, min: 8, max: 12, rest: "short" });
+    renderEditorRows(rows);
+  });
+  document.querySelector("#exercise-library-search").addEventListener("input", () => renderEditorRows(editorRowValues()));
+  document.querySelector("#save-exercise-card").addEventListener("click", () => {
+    const nameInput = document.querySelector("#new-exercise-name");
+    const summaryInput = document.querySelector("#new-exercise-summary");
+    const stepsInput = document.querySelector("#new-exercise-steps");
+    const status = document.querySelector("#exercise-library-status");
+    const name = nameInput.value.trim();
+    if (!name) { status.textContent = "Укажи название упражнения."; nameInput.focus(); return; }
+    if (name.length > 80 || summaryInput.value.length > 180 || stepsInput.value.length > 700) {
+      status.textContent = "Сократи название, подсказку или технику, чтобы сохранить карточку.";
+      return;
+    }
+    if (data.exerciseLibrary.some((card) => exerciseNameKey(card.name) === exerciseNameKey(name))) {
+      status.textContent = "Такое упражнение уже есть в каталоге. Выбери готовую карточку в списке.";
+      return;
+    }
+    const cardId = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const card = { id: cardId, helpId: cardId, name, summary: summaryInput.value.trim(), steps: stepsInput.value.trim(), custom: true };
+    const previousLibrary = data.exerciseLibrary;
+    data.exerciseLibrary = [...data.exerciseLibrary, card];
+    if (!saveData()) { data.exerciseLibrary = previousLibrary; return; }
+    const rows = editorRowValues();
+    rows.push({ exerciseId: cardId, sets: 3, min: 8, max: 12, rest: "short" });
+    renderEditorRows(rows);
+    nameInput.value = ""; summaryInput.value = ""; stepsInput.value = "";
+    status.textContent = `Карточка «${name}» добавлена в каталог и план.`;
+  });
+  document.querySelector("#reset-plan").addEventListener("click", () => renderEditorRows(structuredClone(defaultWorkoutPlans[selectedEditorWorkout].exercises)));
+  document.querySelector("#plan-editor-form").addEventListener("submit", (event) => {
+    event.preventDefault(); const rows = [...document.querySelectorAll(".plan-editor-row")];
+    const error = document.querySelector("#plan-editor-error");
+    const showPlanError = (message) => { error.textContent = message; error.hidden = false; };
+    if (!rows.length) { showPlanError("В плане должно остаться хотя бы одно упражнение."); return; }
+    const names = rows.map((row) => data.exerciseLibrary.find((card) => card.id === row.querySelector('[name="exerciseId"]').value)?.name || "")
+      .map((name) => exerciseNameKey(name));
+    if (new Set(names).size !== names.length) { showPlanError("В плане есть повторяющиеся упражнения. Проверь названия."); return; }
+    const invalidRange = rows.find((row) => Number(row.querySelector('[name="min"]').value) > Number(row.querySelector('[name="max"]').value));
+    if (invalidRange) { showPlanError("Минимум повторений не может быть больше максимума."); return; }
+    error.hidden = true;
+    const old = workoutPlans[selectedEditorWorkout].exercises;
+    const updated = rows.map((row) => {
+      const card = data.exerciseLibrary.find((item) => item.id === row.querySelector('[name="exerciseId"]').value);
+      return { ...structuredClone(card), name: card.name, sets: Number(row.querySelector('[name="sets"]').value), min: Number(row.querySelector('[name="min"]').value), max: Number(row.querySelector('[name="max"]').value), rest: row.querySelector('[name="rest"]').value };
+    });
+    workoutPlans[selectedEditorWorkout].exercises = updated;
+    data.plans = workoutPlans;
+    if (!saveData()) {
+      workoutPlans[selectedEditorWorkout].exercises = old;
+      data.plans = workoutPlans;
+      return;
+    }
+    closeDialog(document.querySelector("#plan-editor-dialog"));
+    renderPlan();
+  });
+  document.querySelector("#body-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form).entries());
+    const targetDate = values.date;
+    const sourceDate = editingBodyDate;
+    const weight = values.weight.trim();
+    const waist = values.waist.trim();
+    const status = document.querySelector("#body-status");
+    if (!isValidDateKey(targetDate) || targetDate > localDateKey()) {
+      status.textContent = "Выбери корректную дату не позднее сегодняшнего дня.";
+      return;
+    }
+    if ((!weight || Number(weight) <= 0) && (!waist || Number(waist) <= 0)) {
+      status.textContent = "Укажи вес, талию или оба показателя.";
+      return;
+    }
+    if (sourceDate && sourceDate !== targetDate) {
+      const targetEntry = data.daily[targetDate] || {};
+      if ((targetEntry.weight || targetEntry.waist) && !window.confirm("На выбранную дату уже есть замер. Заменить его значениями из этой записи?")) return;
+    }
+    const previousDaily = structuredClone(data.daily);
+    if (sourceDate && sourceDate !== targetDate && data.daily[sourceDate]) {
+      delete data.daily[sourceDate].weight;
+      delete data.daily[sourceDate].waist;
+      if (!Object.keys(data.daily[sourceDate]).length) delete data.daily[sourceDate];
+    }
+    const entry = { ...(data.daily[targetDate] || {}) };
+    for (const field of ["weight", "waist"]) {
+      const value = field === "weight" ? weight : waist;
+      if (value && Number(value) > 0) entry[field] = value;
+      else delete entry[field];
+    }
+    if (Object.keys(entry).length) data.daily[targetDate] = entry;
+    else delete data.daily[targetDate];
+    if (!saveData()) {
+      data.daily = previousDaily;
+      return;
+    }
+    editingBodyDate = null;
+    renderBodyMetrics();
+    renderOverview();
+    status.textContent = sourceDate ? "Исправления сохранены." : "Показатели сохранены.";
+    window.setTimeout(() => { status.textContent = ""; }, 3000);
+  });
+  document.querySelector("#cancel-body-edit").addEventListener("click", () => {
+    editingBodyDate = null;
+    document.querySelector("#body-status").textContent = "Редактирование отменено.";
+    renderBodyMetrics();
+  });
+  document.querySelectorAll(".history-tab").forEach((button) => button.addEventListener("click", () => {
+    selectedHistory = button.dataset.history;
+    document.querySelectorAll(".history-tab").forEach((tab) => tab.classList.toggle("active", tab === button));
+    renderHistory();
+  }));
+  document.querySelector("#export-button").addEventListener("click", exportData);
+  document.querySelector("#import-button").addEventListener("click", () => document.querySelector("#backup-import-input").click());
+  document.querySelector("#backup-import-input").addEventListener("change", importDataFile);
+}
+
+function importDataFile(event) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("Файл слишком большой. Максимальный размер копии — 5 МБ.");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onerror = () => showToast("Не удалось прочитать файл резервной копии.");
+  reader.onload = () => {
+    try {
+      const imported = validateImportedBackup(JSON.parse(String(reader.result || "")));
+      if (!window.confirm("Восстановить эту копию? Текущие записи на этом устройстве будут заменены.")) return;
+      const previousData = data;
+      const previousPlans = workoutPlans;
+      data = imported;
+      workoutPlans = data.plans;
+      if (!saveData()) {
+        data = previousData;
+        workoutPlans = previousPlans;
+        return;
+      }
+      document.querySelector("#import-status").textContent = "Копия восстановлена.";
+      renderPlan();
+      renderCalendar();
+      renderBodyMetrics();
+      renderHistory();
+      showView("overview");
+      renderOverview();
+      window.scrollTo(0, 0);
+      showToast("Резервная копия восстановлена");
+    } catch (error) {
+      showToast(error instanceof SyntaxError ? "Файл не является корректным JSON." : (error.message || "Не удалось восстановить копию."));
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportData() {
+  const backup = { format: "ritm-backup", version: 1, exportedAt: new Date().toISOString(), sessions: data.sessions, currentSession: data.currentSession, daily: data.daily, scheduled: data.scheduled, plans: data.plans, exerciseLibrary: data.exerciseLibrary, programCycle: data.programCycle };
+  const contents = JSON.stringify(backup, null, 2);
+  if (window.AndroidBackup) {
+    window.AndroidBackup.save(contents, `ritm-backup-${localDateKey()}.json`);
+    return;
+  }
+  const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ritm-backup-${localDateKey()}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+bindEvents();
+renderOverview();
+if (dataLoadWarning) showToast("Локальные данные повреждены. Если у тебя есть JSON-копия, восстанови её через кнопку внизу страницы.");
+
+const iosInstallHelp = document.querySelector("#ios-install-help");
+const isAppleMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandaloneApp = navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+if (isAppleMobile && !isStandaloneApp && iosInstallHelp) iosInstallHelp.hidden = false;
+
+if ("serviceWorker" in navigator && ["http:", "https:"].includes(location.protocol)) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}), { once: true });
+}

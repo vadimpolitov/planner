@@ -3,25 +3,167 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Мой список дел</title>
-    <link rel="stylesheet" href="style.css" />
+    <meta name="theme-color" content="#f4f5f2" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <title>Ритм — планировщик тренировок</title>
+    <link rel="stylesheet" href="style.css?v=2.0" />
   </head>
   <body>
-    <main class="card">
-      <p class="eyebrow">Планировщик</p>
-      <h1>Список дел</h1>
-      <p class="intro">Запиши небольшую задачу и отметь её, когда закончишь.</p>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#overview" aria-label="Ритм — главная">
+          <span class="brand-mark">Р</span>
+          <span>ритм<span class="brand-dot">.</span></span>
+        </a>
+        <p class="sidebar-label">ТВОЙ ПЛАН</p>
+        <nav class="navigation" aria-label="Основная навигация">
+          <button class="nav-item active" type="button" data-view="overview"><span class="nav-icon">◫</span> Обзор</button>
+          <button class="nav-item" type="button" data-view="plan"><span class="nav-icon">▤</span> План тренировок</button>
+          <button class="nav-item" type="button" data-view="calendar"><span class="nav-icon">▦</span> Календарь</button>
+          <button class="nav-item" type="button" data-view="body"><span class="nav-icon">⌖</span> Показатели</button>
+          <button class="nav-item" type="button" data-view="history"><span class="nav-icon">◷</span> История</button>
+        </nav>
+        <div class="sidebar-note">
+          <span class="note-icon">✳</span>
+          <p>Шесть недель устойчивой работы. Шаг за шагом.</p>
+        </div>
+        <div class="profile"><span class="avatar">Я</span><span><strong>Мой план</strong><small>Старт · 6 недель</small></span></div>
+      </aside>
 
-      <form id="task-form">
-        <label class="visually-hidden" for="task-input">Новая задача</label>
-        <input id="task-input" name="task" type="text" placeholder="Например, погулять" autocomplete="off" />
-        <button type="submit">Добавить</button>
-      </form>
+      <main class="main-content">
+        <header class="topbar">
+          <div><span class="today-label" id="today-label"></span><span class="topbar-caption">Тренировочный дневник</span></div>
+          <button class="quiet-button" id="today-button" type="button">Сегодня <span>⌄</span></button>
+        </header>
 
-      <ul id="task-list" aria-live="polite"></ul>
-      <p id="empty-message" class="empty-message">Пока дел нет. Добавь первое!</p>
-      <p id="task-count" class="task-count">Выполнено: 0 из 0</p>
-    </main>
-    <script src="script.js"></script>
+        <section class="view active" id="view-overview" aria-labelledby="page-title">
+          <div class="page-heading">
+            <div><p class="eyebrow">ТВОЙ РИТМ</p><h1 id="page-title">Планируй. Тренируйся. Расти.</h1><p class="subheading">Стабильность важнее идеальной недели. Отмечай, что получилось.</p></div>
+          </div>
+          <div class="week-strip" id="week-strip" aria-label="Дни этой недели"></div>
+          <section class="panel workout-panel" id="workout-panel"></section>
+          <section class="panel program-progress" id="program-progress" aria-label="Прогресс программы"></section>
+        </section>
+
+        <section class="view" id="view-plan" aria-labelledby="plan-title">
+          <div class="page-heading"><div><p class="eyebrow">6 НЕДЕЛЬ · 3 СИЛОВЫЕ В НЕДЕЛЮ</p><h1 id="plan-title">План тренировок</h1><p class="subheading">В течение 6 недель чередуй 3 тренировки: неделя 1 — А–Б–А, неделя 2 — Б–А–Б. Между тренировками оставляй 1–2 дня отдыха.</p></div></div>
+          <div class="plan-notice"><span>✳</span><p><strong>Перед каждой силовой:</strong> 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения. Разминка не входит в рабочие подходы.</p></div>
+          <div class="plan-cards" id="plan-cards"></div>
+          <div class="plan-footer"><div><span class="footer-icon">↗</span><div><strong>Постепенно увеличивай нагрузку</strong><p>Когда все рабочие подходы достигли верхней границы повторений с чистой техникой, рассмотри увеличение веса.</p></div></div><div class="increase-chips"><span>Присед и тяга <b>+5 кг</b></span><span>Жимы и верх <b>+2–2,5 кг</b></span><span>Гантели и блоки <b>минимальный шаг</b></span></div></div>
+          <p class="plan-disclaimer">Подсказки отражают заданный план и не заменяют оценку техники, самочувствия и рекомендаций специалиста.</p>
+        </section>
+
+        <section class="view" id="view-calendar" aria-labelledby="calendar-title">
+          <div class="page-heading"><div><p class="eyebrow">ТВОЙ РИТМ · 6 НЕДЕЛЬ</p><h1 id="calendar-title">Календарь тренировок</h1><p class="subheading">Запланируй А или Б на удобный день. Переноси занятия, если расписание изменится.</p></div><button class="primary-button calendar-add" id="add-schedule" type="button">＋ Запланировать тренировку</button></div>
+          <div class="calendar-layout">
+            <section class="panel calendar-panel">
+              <div class="calendar-month-bar"><button class="calendar-arrow" id="calendar-prev" type="button" aria-label="Предыдущий месяц">‹</button><h2 id="calendar-month"></h2><button class="calendar-arrow" id="calendar-next" type="button" aria-label="Следующий месяц">›</button><button class="calendar-today" id="calendar-today" type="button">Сегодня</button></div>
+              <div class="calendar-weekdays"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+              <div class="calendar-grid" id="calendar-grid"></div>
+              <div class="calendar-legend"><span><i class="legend-a"></i> Тренировка А</span><span><i class="legend-b"></i> Тренировка Б</span><span><i class="legend-done">✓</i> Тренировка выполнена</span></div>
+            </section>
+            <section class="panel selected-day-panel" id="selected-day-panel"></section>
+          </div>
+        </section>
+
+        <section class="view" id="view-body" aria-labelledby="body-title">
+          <div class="page-heading"><div><p class="eyebrow">ТРЕНДЫ БЕЗ ШУМА</p><h1 id="body-title">Вес и параметры тела</h1><p class="subheading">Записывай утренний вес и талию. Смотри на тенденцию за недели, а не на отдельные колебания.</p></div></div>
+          <div class="body-stats" id="body-stats"></div>
+          <div class="body-grid">
+            <section class="panel body-entry-panel">
+              <div class="panel-heading"><div><p class="eyebrow">ЕЖЕНЕДЕЛЬНЫЙ КОНТРОЛЬ</p><h2 id="body-form-title">Запись за сегодня</h2></div><span class="panel-icon">＋</span></div>
+              <p class="panel-description">Вес — утром после туалета, до еды. Талию измеряй расслабленно на уровне пупка.</p>
+              <form id="body-form" class="daily-form body-form">
+                <label>Дата измерения<input name="date" type="date" required /></label>
+                <label>Вес, кг<input name="weight" type="number" min="0" step="0.1" placeholder="Например, 82,4" /></label>
+                <label>Талия, см<input name="waist" type="number" min="0" step="0.5" placeholder="Например, 91" /></label>
+                <button class="primary-button save-daily" type="submit">Сохранить показатели <span>↗</span></button>
+                <button class="secondary-button cancel-body-edit" id="cancel-body-edit" type="button" hidden>Отменить редактирование</button>
+                <p class="form-status" id="body-status" aria-live="polite"></p>
+              </form>
+            </section>
+            <section class="panel weight-chart-panel">
+              <div class="panel-heading"><div><p class="eyebrow">ПОСЛЕДНИЕ 14 ЗАПИСЕЙ</p><h2>Динамика веса</h2></div><span class="chart-legend"><i></i> Вес, кг</span></div>
+              <div id="weight-trend" class="chart-summary" aria-live="polite"></div>
+              <div id="weight-chart" class="weight-chart"></div>
+              <div class="panel-heading waist-chart-heading"><div><p class="eyebrow">ПОСЛЕДНИЕ 14 ЗАПИСЕЙ</p><h2>Динамика талии</h2></div><span class="chart-legend waist-legend"><i></i> Талия, см</span></div>
+              <div id="waist-trend" class="chart-summary" aria-live="polite"></div>
+              <div id="waist-chart" class="weight-chart"></div>
+            </section>
+          </div>
+          <section class="panel measurement-history">
+            <div class="panel-heading"><div><p class="eyebrow">ИСТОРИЯ ЗАМЕРОВ</p><h2>Записи измерений</h2><p class="panel-description">Исправь запись или удали её, если замер внесён ошибочно.</p></div></div>
+            <div id="body-history"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-history" aria-labelledby="history-title">
+          <div class="page-heading"><div><p class="eyebrow">ТВОЯ РАБОТА СО ВРЕМЕНЕМ</p><h1 id="history-title">История</h1><p class="subheading">Здесь собраны завершённые тренировки и ежедневные отметки.</p></div></div>
+          <div class="history-tabs"><button class="history-tab active" type="button" data-history="workouts">Тренировки</button><button class="history-tab" type="button" data-history="daily">Ежедневные записи</button></div>
+          <div id="history-content"></div>
+        </section>
+
+        <section class="view" id="view-session" aria-labelledby="session-title">
+          <div class="session-top"><button class="back-button" id="back-overview" type="button">← <span>Назад к обзору</span></button><span class="session-date" id="session-date"></span></div>
+          <div id="session-content"></div>
+        </section>
+        <footer class="app-footer"><span>ритм<span class="brand-dot">.</span></span><span>Данные хранятся на этом устройстве</span><div class="backup-actions"><button type="button" id="export-button">Скачать резервную копию</button><button type="button" id="import-button">Восстановить из копии</button><input id="backup-import-input" type="file" accept=".json,application/json" hidden /></div><span id="import-status" class="import-status" role="status" aria-live="polite"></span><p id="ios-install-help" class="ios-install-help" hidden>На iPhone: в Safari нажми «Поделиться» → «На экран Домой».</p></footer>
+      </main>
+    </div>
+    <div class="dialog-backdrop" id="schedule-dialog" hidden>
+      <section class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-dialog-title">
+        <button class="dialog-close" type="button" data-close-dialog="schedule-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">РАСПИСАНИЕ</p><h2 id="schedule-dialog-title">Запланировать тренировку</h2><p id="schedule-description" class="dialog-description">Выбери день и тип занятия. План всегда можно изменить.</p>
+        <form id="schedule-form" class="dialog-form"><input type="hidden" name="id" /><p id="schedule-error" class="form-status dialog-error" role="alert" hidden></p><label>Дата<input name="date" type="date" required /></label><label>Тренировка<select name="workout"><option value="A">Тренировка А</option><option value="B">Тренировка Б</option></select></label><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="schedule-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить</button></div></form>
+      </section>
+    </div>
+    <div class="dialog-backdrop" id="program-editor-dialog" hidden>
+      <section class="app-dialog program-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="program-editor-title">
+        <button class="dialog-close" type="button" data-close-dialog="program-editor-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">ТВОЯ ПРОГРАММА</p><h2 id="program-editor-title">Изменить прогресс</h2>
+        <p class="dialog-description">Исправь дату старта или текущую позицию в цикле. История тренировок при этом не меняется.</p>
+        <form id="program-editor-form" class="dialog-form">
+          <p id="program-editor-error" class="form-status dialog-error" role="alert" hidden></p>
+          <label>Дата начала цикла<input name="startDate" type="date" required /></label>
+          <label>Выполнено тренировок в цикле<input name="progress" type="number" min="0" max="18" step="1" required /></label>
+          <p class="program-editor-hint">Изменение числа занятий повлияет на следующую тренировку по плану, но не добавит запись в историю.</p>
+          <div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="program-editor-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить</button></div>
+        </form>
+      </section>
+    </div>
+    <div class="dialog-backdrop" id="plan-editor-dialog" hidden>
+      <section class="app-dialog plan-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-editor-title">
+        <button class="dialog-close" type="button" data-close-dialog="plan-editor-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">НАСТРОЙКА ПЛАНА</p><h2 id="plan-editor-title">Изменить тренировку</h2><p class="dialog-description">Выбирай упражнения из каталога. Свои карточки можно добавить ниже; план и каталог сохраняются на этом устройстве.</p>
+        <form id="plan-editor-form" class="dialog-form"><input type="hidden" name="workout" /><p id="plan-editor-error" class="form-status dialog-error" role="alert" hidden></p><label class="exercise-search-label">Поиск упражнения<input id="exercise-library-search" type="search" placeholder="Название или группа мышц" autocomplete="off" /></label><div id="plan-editor-rows" class="plan-editor-rows"></div><div class="editor-actions"><button class="secondary-button" id="add-exercise" type="button">＋ Добавить из каталога</button><button class="text-button" id="reset-plan" type="button">Вернуть исходный план</button></div><section class="exercise-library-create" aria-labelledby="exercise-library-title"><h3 id="exercise-library-title">Добавить свою карточку</h3><p>Свои упражнения сохраняются в каталоге и становятся доступны в обоих планах.</p><div class="exercise-library-fields"><label>Название упражнения<input id="new-exercise-name" maxlength="80" placeholder="Например, тяга гантели одной рукой" /></label><label>Краткая подсказка, необязательно<input id="new-exercise-summary" maxlength="180" placeholder="На что обратить внимание" /></label><label>Техника выполнения, необязательно<textarea id="new-exercise-steps" rows="3" maxlength="700" placeholder="Кратко опиши шаги выполнения"></textarea></label></div><button class="secondary-button" id="save-exercise-card" type="button">＋ Добавить карточку</button><p id="exercise-library-status" class="form-status" role="status" aria-live="polite"></p></section><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="plan-editor-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить план</button></div></form>
+      </section>
+    </div>
+    <div class="dialog-backdrop" id="session-editor-dialog" hidden>
+      <section class="app-dialog session-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="session-editor-title">
+        <button class="dialog-close" type="button" data-close-dialog="session-editor-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">ИСТОРИЯ ТРЕНИРОВОК</p><h2 id="session-editor-title">Исправить запись</h2>
+        <p class="dialog-description">Измени дату, тяжесть занятия, отметки упражнений и результаты подходов.</p>
+        <form id="session-editor-form" class="dialog-form"><div class="session-editor-meta"><label>Дата тренировки<input name="date" type="date" required /></label><label>Тяжесть, 1–10<input name="effort" type="number" min="1" max="10" step="1" /></label></div><p id="session-editor-error" class="form-status dialog-error" role="alert" hidden></p><div id="session-editor-entries" class="session-editor-entries"></div><div class="dialog-actions"><button class="secondary-button" id="cancel-session-edit" type="button" data-close-dialog="session-editor-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить исправления</button></div></form>
+      </section>
+    </div>
+    <div class="dialog-backdrop" id="exercise-dialog" hidden>
+      <section class="app-dialog exercise-dialog" role="dialog" aria-modal="true" aria-labelledby="exercise-dialog-title">
+        <button class="dialog-close" type="button" data-close-dialog="exercise-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">СПРАВКА ОБ УПРАЖНЕНИИ</p><h2 id="exercise-dialog-title"></h2><p id="exercise-dialog-summary" class="dialog-description"></p>
+        <figure id="exercise-image-wrap" class="exercise-image-wrap" hidden><img id="exercise-image" alt="" /><figcaption id="exercise-image-credit"></figcaption></figure>
+        <div class="technique-block"><h3>Выполнение по шагам</h3><ol id="exercise-steps"></ol></div><section class="exercise-cue-block"><h3>Важные ориентиры</h3><p id="exercise-cue" class="exercise-cue"></p></section><a id="exercise-source" class="exercise-source" href="&#104;&#116;&#116;&#112;&#115;://www.acefitness.org/resources/everyone/exercise-library/" target="_blank" rel="noreferrer">Открыть библиотеку упражнений ↗</a>
+      </section>
+    </div>
+    <div class="dialog-backdrop" id="finish-dialog" hidden>
+      <section class="app-dialog finish-dialog" role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title">
+        <p class="eyebrow">ЗАВЕРШЕНИЕ ТРЕНИРОВКИ</p><h2 id="finish-dialog-title">Сохранить неполное занятие?</h2><p id="finish-summary" class="dialog-description"></p>
+        <div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="finish-dialog">Вернуться к тренировке</button><button class="primary-button" id="save-partial-workout" type="button">Сохранить как неполную</button></div>
+      </section>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="script.js?v=1.9"></script>
   </body>
 </html>
