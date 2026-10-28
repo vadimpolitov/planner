@@ -1,4 +1,4 @@
-const CACHE_NAME = "ritm-app-shell-v1";
+const CACHE_NAME = "ritm-app-shell-v2";
 const APP_FILES = [
   "./",
   "./index.html",

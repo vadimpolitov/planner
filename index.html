@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
-    <link rel="stylesheet" href="style.css?v=2.0" />
+    <link rel="stylesheet" href="style.css?v=2.1" />
   </head>
   <body>
     <div class="app-shell">
@@ -30,13 +30,13 @@
           <span class="note-icon">✳</span>
           <p>Шесть недель устойчивой работы. Шаг за шагом.</p>
         </div>
-        <div class="profile"><span class="avatar">Я</span><span><strong>Мой план</strong><small>Старт · 6 недель</small></span></div>
+        <div class="profile" id="active-profile-badge"><span class="avatar" id="profile-avatar">В</span><span><strong id="profile-name">План Вадима</strong><small>Личные тренировки</small></span></div>
       </aside>
 
       <main class="main-content">
         <header class="topbar">
           <div><span class="today-label" id="today-label"></span><span class="topbar-caption">Тренировочный дневник</span></div>
-          <button class="quiet-button" id="today-button" type="button">Сегодня <span>⌄</span></button>
+          <div class="topbar-actions"><label class="profile-switcher"><span>Профиль</span><select id="profile-switcher" aria-label="Активный профиль"></select></label><button class="quiet-button" id="today-button" type="button">Сегодня <span>⌄</span></button></div>
         </header>
 
         <section class="view active" id="view-overview" aria-labelledby="page-title">
@@ -52,7 +52,7 @@
           <div class="page-heading"><div><p class="eyebrow">6 НЕДЕЛЬ · 3 СИЛОВЫЕ В НЕДЕЛЮ</p><h1 id="plan-title">План тренировок</h1><p class="subheading">В течение 6 недель чередуй 3 тренировки: неделя 1 — А–Б–А, неделя 2 — Б–А–Б. Между тренировками оставляй 1–2 дня отдыха.</p></div></div>
           <div class="plan-notice"><span>✳</span><p><strong>Перед каждой силовой:</strong> 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения. Разминка не входит в рабочие подходы.</p></div>
           <div class="plan-cards" id="plan-cards"></div>
-          <div class="plan-footer"><div><span class="footer-icon">↗</span><div><strong>Постепенно увеличивай нагрузку</strong><p>Когда все рабочие подходы достигли верхней границы повторений с чистой техникой, рассмотри увеличение веса.</p></div></div><div class="increase-chips"><span>Присед и тяга <b>+5 кг</b></span><span>Жимы и верх <b>+2–2,5 кг</b></span><span>Гантели и блоки <b>минимальный шаг</b></span></div></div>
+          <div class="plan-footer" id="plan-guidance"></div>
           <p class="plan-disclaimer">Подсказки отражают заданный план и не заменяют оценку техники, самочувствия и рекомендаций специалиста.</p>
         </section>
 
@@ -138,7 +138,7 @@
       <section class="app-dialog plan-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-editor-title">
         <button class="dialog-close" type="button" data-close-dialog="plan-editor-dialog" aria-label="Закрыть">×</button>
         <p class="eyebrow">НАСТРОЙКА ПЛАНА</p><h2 id="plan-editor-title">Изменить тренировку</h2><p class="dialog-description">Выбирай упражнения из каталога. Свои карточки можно добавить ниже; план и каталог сохраняются на этом устройстве.</p>
-        <form id="plan-editor-form" class="dialog-form"><input type="hidden" name="workout" /><p id="plan-editor-error" class="form-status dialog-error" role="alert" hidden></p><label class="exercise-search-label">Поиск упражнения<input id="exercise-library-search" type="search" placeholder="Название или группа мышц" autocomplete="off" /></label><div id="plan-editor-rows" class="plan-editor-rows"></div><div class="editor-actions"><button class="secondary-button" id="add-exercise" type="button">＋ Добавить из каталога</button><button class="text-button" id="reset-plan" type="button">Вернуть исходный план</button></div><section class="exercise-library-create" aria-labelledby="exercise-library-title"><h3 id="exercise-library-title">Добавить свою карточку</h3><p>Свои упражнения сохраняются в каталоге и становятся доступны в обоих планах.</p><div class="exercise-library-fields"><label>Название упражнения<input id="new-exercise-name" maxlength="80" placeholder="Например, тяга гантели одной рукой" /></label><label>Краткая подсказка, необязательно<input id="new-exercise-summary" maxlength="180" placeholder="На что обратить внимание" /></label><label>Техника выполнения, необязательно<textarea id="new-exercise-steps" rows="3" maxlength="700" placeholder="Кратко опиши шаги выполнения"></textarea></label></div><button class="secondary-button" id="save-exercise-card" type="button">＋ Добавить карточку</button><p id="exercise-library-status" class="form-status" role="status" aria-live="polite"></p></section><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="plan-editor-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить план</button></div></form>
+        <form id="plan-editor-form" class="dialog-form"><input type="hidden" name="workout" /><p id="plan-editor-error" class="form-status dialog-error" role="alert" hidden></p><label class="exercise-search-label">Поиск упражнения<input id="exercise-library-search" type="search" placeholder="Название или группа мышц" autocomplete="off" /></label><div id="plan-editor-rows" class="plan-editor-rows"></div><div class="editor-actions"><button class="secondary-button" id="add-exercise" type="button">＋ Добавить из каталога</button><button class="text-button" id="reset-plan" type="button">Вернуть исходный план</button></div><section class="exercise-library-create" aria-labelledby="exercise-library-title"><h3 id="exercise-library-title">Добавить свою карточку</h3><p>Карточки сохраняются в каталоге активного профиля и доступны в обоих его планах.</p><div class="exercise-library-fields"><label>Название упражнения<input id="new-exercise-name" maxlength="80" placeholder="Например, тяга гантели одной рукой" /></label><label>Краткая подсказка, необязательно<input id="new-exercise-summary" maxlength="180" placeholder="На что обратить внимание" /></label><label>Техника выполнения, необязательно<textarea id="new-exercise-steps" rows="3" maxlength="700" placeholder="Кратко опиши шаги выполнения"></textarea></label></div><button class="secondary-button" id="save-exercise-card" type="button">＋ Добавить карточку</button><p id="exercise-library-status" class="form-status" role="status" aria-live="polite"></p></section><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="plan-editor-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить план</button></div></form>
       </section>
     </div>
     <div class="dialog-backdrop" id="session-editor-dialog" hidden>

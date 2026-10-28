@@ -1,4 +1,8 @@
-const storageKey = "planner-workout-tracker";
+const storageKeyBase = "planner-workout-tracker";
+const profileRegistryKey = `${storageKeyBase}-profiles`;
+let profileRegistry = null;
+let activeProfile = null;
+let storageKey = storageKeyBase;
 const restTimer = { interval: null, remaining: 0, activeButton: null };
 let timerAudioContext = null;
 let timerPresetManuallyChanged = false;
@@ -34,6 +38,66 @@ const defaultWorkoutPlans = {
   },
 };
 
+const wifeWorkoutPlans = {
+  A: {
+    name: "Тренировка А",
+    subtitle: "Базовые движения с гантелями и спокойная работа на всё тело",
+    exercises: [
+      { name: "Присед с гантелью у груди", helpId: "goblet-squat", sets: 3, min: 8, max: 12, kind: "lower", rest: "long" },
+      { name: "Жим гантелей лёжа", helpId: "dumbbell-bench", sets: 3, min: 8, max: 12, kind: "upper", rest: "long" },
+      { name: "Тяга гантели одной рукой с опорой", helpId: "one-arm-row", optionHelpIds: ["one-arm-row", "row"], options: ["Тяга гантели одной рукой с опорой", "Тяга штанги в наклоне"], sets: 3, min: 8, max: 12, kind: "upper", rest: "long" },
+      { name: "Румынская тяга с гантелями", helpId: "dumbbell-romanian-deadlift", sets: 3, min: 8, max: 10, kind: "lower", rest: "long" },
+      { name: "Жим гантелей сидя", helpId: "overhead-press", sets: 2, min: 10, max: 12, kind: "upper", rest: "short" },
+      { name: "Разгибание рук на блоке", helpId: "triceps-pushdown", sets: 2, min: 10, max: 15, kind: "isolation", rest: "short" },
+      { name: "Скручивания на блоке с весом", helpId: "cable-crunch", sets: 2, min: 10, max: 15, kind: "isolation", rest: "short" },
+    ],
+  },
+  B: {
+    name: "Тренировка Б",
+    subtitle: "Ягодичный мост, наклонный жим и тяги без становой",
+    exercises: [
+      { name: "Ягодичный мост со штангой", helpId: "barbell-hip-thrust", sets: 3, min: 8, max: 12, kind: "lower", rest: "long" },
+      { name: "Жим гантелей на наклонной скамье", helpId: "dumbbell-incline-press", sets: 3, min: 8, max: 12, kind: "upper", rest: "long" },
+      { name: "Тяга верхнего блока к груди", helpId: "lat-pulldown", sets: 3, min: 8, max: 12, kind: "upper", rest: "long" },
+      { name: "Болгарские выпады с гантелями", helpId: "split-squat", sets: 3, min: 8, max: 10, kind: "accessory", rest: "long", sideNote: "на ногу" },
+      { name: "Сгибание одной ноги в кроссовере с манжетой", helpId: "cable-leg-curl", sets: 2, min: 12, max: 15, kind: "isolation", rest: "short" },
+      { name: "Махи гантелями в стороны", helpId: "lateral-raise", sets: 2, min: 12, max: 20, kind: "isolation", rest: "short" },
+      { name: "Подъём гантелей на бицепс", helpId: "biceps-curl", sets: 2, min: 10, max: 15, kind: "isolation", rest: "short" },
+      { name: "Pallof press в кроссовере", helpId: "pallof", sets: 2, min: 10, max: 12, kind: "isolation", rest: "short", sideNote: "на сторону" },
+    ],
+  },
+};
+
+const workoutPlanPresets = { vadim: defaultWorkoutPlans, wife: wifeWorkoutPlans };
+
+function getDefaultProfiles() {
+  return [
+    { id: "vadim", name: "План Вадима", presetId: "vadim", dataKey: storageKeyBase },
+    { id: "wife", name: "План жены", presetId: "wife", dataKey: `${storageKeyBase}::wife` },
+  ];
+}
+
+function loadProfileRegistry() {
+  const defaults = getDefaultProfiles();
+  try {
+    const saved = JSON.parse(localStorage.getItem(profileRegistryKey) || "null");
+    if (saved && Array.isArray(saved.profiles)) {
+      const profiles = defaults.map((profile) => {
+        const stored = saved.profiles.find((item) => item?.id === profile.id);
+        return { ...profile, name: typeof stored?.name === "string" && stored.name.trim() ? stored.name.trim() : profile.name };
+      });
+      return { profiles, activeProfileId: profiles.some((profile) => profile.id === saved.activeProfileId) ? saved.activeProfileId : "vadim" };
+    }
+  } catch {}
+  const registry = { profiles: defaults, activeProfileId: "vadim" };
+  try { localStorage.setItem(profileRegistryKey, JSON.stringify(registry)); } catch {}
+  return registry;
+}
+
+function saveProfileRegistry() {
+  try { localStorage.setItem(profileRegistryKey, JSON.stringify(profileRegistry)); } catch { showToast("Не удалось сохранить выбор профиля на этом устройстве."); }
+}
+
 function exerciseNameKey(name) {
   return String(name || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("ru-RU");
 }
@@ -46,7 +110,7 @@ function exerciseHash(name) {
 
 function mergeExerciseLibrary(savedLibrary = [], plans = defaultWorkoutPlans) {
   const cards = new Map();
-  const builtInHelpIds = new Set(Object.values(defaultWorkoutPlans)
+  const builtInHelpIds = new Set(Object.values(workoutPlanPresets).flatMap((preset) => Object.values(preset))
     .flatMap((plan) => plan.exercises.flatMap((exercise) => [exercise.helpId, ...(exercise.optionHelpIds || [])])).filter(Boolean));
   const addCard = (exercise, name, helpId, custom = false) => {
     const key = exerciseNameKey(name);
@@ -62,7 +126,7 @@ function mergeExerciseLibrary(savedLibrary = [], plans = defaultWorkoutPlans) {
       sideNote: exercise.sideNote || undefined,
     });
   };
-  for (const sourcePlans of [defaultWorkoutPlans, plans]) {
+  for (const sourcePlans of [...Object.values(workoutPlanPresets), plans]) {
     for (const plan of Object.values(sourcePlans || {})) {
       for (const exercise of plan?.exercises || []) {
         addCard(exercise, exercise.name, exercise.helpId, !exercise.helpId || !builtInHelpIds.has(exercise.helpId));
@@ -91,28 +155,40 @@ function mergeExerciseLibrary(savedLibrary = [], plans = defaultWorkoutPlans) {
   return [...cards.values()];
 }
 
-let workoutPlans = structuredClone(defaultWorkoutPlans);
+profileRegistry = loadProfileRegistry();
+activeProfile = profileRegistry.profiles.find((profile) => profile.id === profileRegistry.activeProfileId) || getDefaultProfiles()[0];
+storageKey = activeProfile.dataKey;
+let activePlanDefaults = workoutPlanPresets[activeProfile.presetId] || defaultWorkoutPlans;
+let workoutPlans = structuredClone(activePlanDefaults);
 const defaultData = { sessions: [], daily: {}, currentSession: null, scheduled: [], plans: null, exerciseLibrary: [], programCycle: null };
 let dataLoadWarning = false;
 let corruptStoredData = null;
-let data = loadData();
-workoutPlans = data.planVersion === 2 && data.plans ? data.plans : structuredClone(defaultWorkoutPlans);
-// Keep previously saved plans intact while attaching the correct help for each pull-up option.
-const savedPullupPlan = workoutPlans.B?.exercises?.find((exercise) => Array.isArray(exercise.options)
-  && exercise.options.includes("Подтягивания") && exercise.options.includes("Тяга верхнего блока"));
-if (savedPullupPlan) {
-  savedPullupPlan.helpId = "pullup";
-  savedPullupPlan.optionHelpIds = ["pullup", "lat-pulldown"];
+let data = structuredClone(defaultData);
+
+function initializeActiveProfileData() {
+  dataLoadWarning = false;
+  corruptStoredData = null;
+  activePlanDefaults = workoutPlanPresets[activeProfile.presetId] || defaultWorkoutPlans;
+  data = loadData();
+  workoutPlans = data.planVersion === 2 && data.plans ? data.plans : structuredClone(activePlanDefaults);
+  const savedPullupPlan = workoutPlans.B?.exercises?.find((exercise) => Array.isArray(exercise.options)
+    && exercise.options.includes("Подтягивания") && exercise.options.includes("Тяга верхнего блока"));
+  if (savedPullupPlan) {
+    savedPullupPlan.helpId = "pullup";
+    savedPullupPlan.optionHelpIds = ["pullup", "lat-pulldown"];
+  }
+  data.plans = workoutPlans;
+  data.exerciseLibrary = mergeExerciseLibrary(data.exerciseLibrary, workoutPlans);
+  data.planVersion = 2;
+  data.currentSession = normalizeCurrentSession(data.currentSession, workoutPlans);
+  data.programCycle = normalizeProgramCycle(data.programCycle, data.sessions);
+  if (corruptStoredData !== null) {
+    try { localStorage.setItem(`${storageKey}-recovery-${Date.now()}`, corruptStoredData); } catch {}
+  }
+  saveData();
 }
-data.plans = workoutPlans;
-data.exerciseLibrary = mergeExerciseLibrary(data.exerciseLibrary, workoutPlans);
-data.planVersion = 2;
-data.currentSession = normalizeCurrentSession(data.currentSession, workoutPlans);
-data.programCycle = normalizeProgramCycle(data.programCycle, data.sessions);
-if (corruptStoredData !== null) {
-  try { localStorage.setItem(`${storageKey}-recovery-${Date.now()}`, corruptStoredData); } catch {}
-}
-saveData();
+
+initializeActiveProfileData();
 const dialogReturnFocus = new WeakMap();
 let selectedHistory = "workouts";
 let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -162,6 +238,12 @@ const exerciseHelp = {
 
 
 Object.assign(exerciseHelp, {
+  "goblet-squat": ["Присед с гантелью у груди", "Держи гантель у груди и садись между ног, сохраняя стопы устойчивыми и колени направленными по носкам.", "Возьми одну гантель за верхний край и прижми её к груди; локти направь вниз.; Поставь стопы примерно на ширине плеч или чуть шире — выбери устойчивую стойку.; Вдохни, напряги живот и одновременно согни колени и таз, опускаясь между бёдер.; Следи, чтобы пятки оставались на полу, а колени двигались в направлении носков.; Опустись только до комфортной глубины, где спина остаётся собранной.; Оттолкнись всей стопой и встань, не переразгибая колени вверху.; Не округляй спину, не отрывай пятки и не позволяй гантели уходить далеко от груди.", "Начни с лёгкой гантели. Если теряется равновесие или появляется боль, остановись и уменьши глубину или вес."],
+  "dumbbell-bench": ["Жим гантелей лёжа", "Удерживай лопатки на скамье и опускай гантели подконтрольно по обе стороны груди.", "Сядь на край скамьи, положи гантели на бёдра и аккуратно ляг; поставь стопы всей подошвой на пол.; Сведи и опусти лопатки, напряги корпус; держи голову, верх спины и таз на скамье.; Подними гантели над грудью, кисти держи ровно над локтями.; На вдохе плавно опускай гантели к бокам груди, направляя локти немного ниже линии плеч.; Остановись в комфортной глубине, не растягивая плечи через боль.; На выдохе выжми гантели вверх симметрично, не сталкивая их друг с другом.; Не отбивай вес, не прогибай поясницу чрезмерно и не позволяй плечам уходить вперёд.", "Начни с лёгких гантелей и попроси подать их, если тяжело безопасно занять исходное положение."],
+  "one-arm-row": ["Тяга гантели одной рукой с опорой", "Сохраняй корпус неподвижным и веди локоть к поясу, не разворачивая плечи вслед за гантелью.", "Поставь одно колено и одноимённую ладонь на скамью; вторую стопу устойчиво оставь на полу.; Выровняй спину, напряги живот и опусти рабочую руку с гантелью под плечом.; На выдохе начни движение лопаткой и подтяни локоть вдоль корпуса к поясу.; Коротко задержись наверху, не поднимая плечо к уху.; На вдохе медленно опусти гантель, сохраняя опору и нейтральное положение спины.; Выполни все повторы одной рукой, затем поменяй сторону.; Не скручивай таз и плечи, не дёргай вес и не округляй поясницу.", "Начни со слабой стороны и подбери одинаковое число повторений для обеих рук; вес не должен поворачивать корпус."],
+  "dumbbell-romanian-deadlift": ["Румынская тяга с гантелями", "Отводи таз назад, сохраняя небольшой сгиб коленей и гантели близко к бёдрам и голеням.", "Встань устойчиво, держи гантели перед бёдрами; колени слегка согнуты.; Вдохни и напряги корпус, затем отведи таз назад, будто закрываешь им дверь.; Опускай гантели вдоль ног, сохраняя спину в нейтральном положении и почти вертикальные голени.; Остановись, когда почувствуешь натяжение задней поверхности бёдер или раньше, если спина начинает округляться.; На выдохе разогни таз и вернись в стойку, напрягая ягодицы.; Не превращай движение в присед, не уводи гантели вперёд и не отклоняйся назад в верхней точке.", "Осваивай движение с лёгкими гантелями и не стремись опустить их ниже доступной амплитуды."],
+  "barbell-hip-thrust": ["Ягодичный мост со штангой", "Поднимай таз за счёт ягодиц до прямой линии корпуса и бёдер, не переразгибая поясницу.", "Сядь на пол спиной к скамье и расположи её край под нижней частью лопаток.; Положи мягкую накладку на гриф и размести штангу в складке таза; стопы поставь примерно на ширине таза.; Напряги живот, подбородок слегка направь к груди и упрись всей стопой в пол.; На выдохе подними таз, сжимая ягодицы; в верхней точке голени примерно вертикальны, а корпус и бёдра образуют линию.; Сделай короткую паузу без прогиба в пояснице.; На вдохе опускай таз медленно и подконтрольно.; Не толкайся носками, не переразгибай поясницу и не допускай боли от давления грифа.", "Сначала отработай движение без веса. Используй накладку на гриф и начинай с нагрузки, которую легко контролировать."],
+  "dumbbell-incline-press": ["Жим гантелей на наклонной скамье", "Установи небольшой наклон и жми гантели симметрично, сохраняя плечи и лопатки устойчивыми.", "Установи спинку скамьи примерно на 20–30 градусов и поставь стопы всей подошвой на пол.; Аккуратно ляг, сведи и опусти лопатки; напряги корпус.; Подними гантели над верхней частью груди, кисти держи ровно над локтями.; На вдохе медленно опусти гантели по сторонам верхней части груди; локти направляй вниз и немного в стороны.; Не опускай вес ниже комфортной амплитуды плеч.; На выдохе выжми гантели вверх по плавной дуге, не сталкивая их.; Не поднимай плечи к ушам, не отбивай вес и не прогибай поясницу ради большего усилия.", "Начни с лёгких гантелей; выбирай наклон, при котором плечи двигаются без дискомфорта."],
   squat: ["Приседания со штангой", "Стопы примерно на ширине плеч; глубина должна оставаться контролируемой и комфортной.", "Установи гриф на верх спины, симметрично возьмись и сними его со стоек.; Сделай короткие шаги назад и поставь стопы устойчиво.; Сохраняя спину собранной, отведи таз и согни колени; колени направляй по линии носков.; Опустись до доступной глубины без потери равновесия, затем встань, отталкиваясь всей стопой.; Не округляй спину и не допускай резких движений коленей внутрь.", "Осваивай движение с лёгким весом и выставь страховочные упоры."],
   bench: ["Жим штанги лёжа", "Лопатки и стопы помогают сохранять устойчивое положение на скамье.", "Ляг так, чтобы глаза были под грифом; поставь стопы на пол и сведи лопатки.; Возьмись симметрично чуть шире плеч и сними штангу над грудью.; Плавно опусти гриф к середине груди, сохраняя контроль.; Выжми его вверх и верни на стойки после последнего повтора.; Не отбивай гриф от груди и не теряй устойчивое положение корпуса.", "Работай со страхующим или страховочными упорами."],
   row: ["Тяга штанги в наклоне", "Сохраняй наклон корпуса и тяни штангу к нижним рёбрам без рывка.", "Поставь стопы устойчиво, слегка согни колени и наклони корпус примерно на 45 градусов.; Возьмись за гриф хватом сверху, напряги корпус и сохрани спину ровной.; Подтяни гриф к нижним рёбрам, ведя локти назад.; Коротко сведи лопатки, затем медленно опусти гриф.; Не выпрямляй корпус рывком и не округляй спину.", "Если поясница устаёт или наклон не удаётся удерживать, используй вариант с опорой грудью."],
@@ -271,7 +353,7 @@ function validateImportedBackup(raw) {
       || !raw.daily || typeof raw.daily !== "object" || Array.isArray(raw.daily)) {
     throw new Error("Файл не похож на резервную копию Ритма.");
   }
-  const plans = raw.plans ? structuredClone(raw.plans) : structuredClone(defaultWorkoutPlans);
+  const plans = raw.plans ? structuredClone(raw.plans) : structuredClone(activePlanDefaults);
   for (const type of ["A", "B"]) {
     const plan = plans[type];
     if (!plan || !Array.isArray(plan.exercises)) throw new Error(`В копии отсутствует план тренировки ${type}.`);
@@ -666,6 +748,9 @@ function renderBodyMetrics() {
 
 function renderPlan() {
   document.querySelector("#plan-cards").innerHTML = Object.entries(workoutPlans).map(([type, plan]) => `<article class="plan-card"><header class="plan-card-header"><span class="workout-badge">${type}</span><div><h2>${escapeHtml(plan.name)}</h2><p>${escapeHtml(plan.subtitle)}</p></div><button class="secondary-button" data-edit-plan="${type}" type="button">Изменить план</button><span class="exercise-total">${plan.exercises.length} УПРАЖНЕНИЙ</span></header><div class="plan-table"><div class="plan-table-head"><span>Упражнение</span><span>Рабочие подходы</span><span>Отдых</span></div>${plan.exercises.map((exercise) => `<div class="plan-row"><div><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.helpId || "general")}">${escapeHtml(exercise.name)} ⓘ</button>${exercise.options ? `<span class="alternatives">или ${escapeHtml(exercise.options[1])}</span>` : ""}${exercise.sideNote ? `<span class="alternatives">${escapeHtml(exercise.sideNote)}</span>` : ""}</div><b>${exercise.sets} × ${exercise.min}–${exercise.max}</b><span class="rest-cell">${exercise.rest === "long" ? "2–3 мин" : "60–90 сек"}</span></div>`).join("")}</div></article>`).join("");
+  document.querySelector("#plan-guidance").innerHTML = activeProfile.id === "wife"
+    ? `<div><span class="footer-icon">↗</span><div><strong>Прогрессируй постепенно</strong><p>Первые две недели оставляй 2–3 повтора в запасе, затем — 1–2. Когда все подходы достигли верхней границы с чистой техникой, добавь минимальный доступный вес.</p></div></div><div class="increase-chips"><span>Недели 1–2 <b>2–3 повтора в запасе</b></span><span>Далее <b>1–2 повтора в запасе</b></span><span>Рост нагрузки <b>минимальный шаг</b></span><span>Присед со штангой <b>после 3 × 12 с 16–20 кг</b></span><span>4-й день <b>лёгкое кардио / техника</b></span></div>`
+    : `<div><span class="footer-icon">↗</span><div><strong>Постепенно увеличивай нагрузку</strong><p>Когда все рабочие подходы достигли верхней границы повторений с чистой техникой, рассмотри увеличение веса.</p></div></div><div class="increase-chips"><span>Присед и тяга <b>+5 кг</b></span><span>Жимы и верх <b>+2–2,5 кг</b></span><span>Гантели и блоки <b>минимальный шаг</b></span></div>`;
   document.querySelectorAll("[data-edit-plan]").forEach((button) => button.addEventListener("click", () => openPlanEditor(button.dataset.editPlan)));
   bindHelpLinks();
 }
@@ -775,6 +860,12 @@ function openExerciseHelp(id) {
     "Начни с лёгкой нагрузки и увеличивай её постепенно, сохраняя контроль движения.",
   ] : exerciseHelp.general);
   const source = {
+    "goblet-squat": "https://www.championat.com/lifestyle/article-4869565-s-chego-nachat-trenirovku-v-trenazhernom-zale-devushke-bez-trenera-kompleks-uprazhnenij-dlya-novichkov.html",
+    "dumbbell-bench": "https://www.championat.com/lifestyle/article-4869565-s-chego-nachat-trenirovku-v-trenazhernom-zale-devushke-bez-trenera-kompleks-uprazhnenij-dlya-novichkov.html",
+    "one-arm-row": "https://www.championat.com/lifestyle/article-5414120-tyaga-ganteli-k-poyasu-tehnika-uprazhneniya-kakie-myshschy-rabotayut.html",
+    "dumbbell-romanian-deadlift": "https://www.championat.com/lifestyle/article-5710238-rumynskaya-tyaga-so-shtangoj-tehnika-vypolneniya-kakie-myshcy-rabotayut-kak-pravilno-delat-uprazhnenie.html",
+    "barbell-hip-thrust": "https://www.championat.com/lifestyle/article-5224419-yagodnichnyj-mostik-kak-pravilno-delat-uprazhnenie-tehnika.html",
+    "dumbbell-incline-press": "https://www.championat.com/lifestyle/article-5284038-zhim-gantelej-na-naklonnoj-skame-tehnika-uprazhneniya-i-kakie-myshcy-rabotayut.html",
     squat: "https://www.championat.com/lifestyle/article-5167991-chto-takoe-olimpijskie-prisedaniya-prisedaniya-so-shtangoj-na-spine.html",
     bench: "https://www.championat.com/lifestyle/article-4488421-kak-pravilno-delat-bazovye-uprazhneniya-bezopasnaya-tehnika-zhima-lezha-stanovoj-tyagi-prisedanij-so-shtangoj.html",
     row: "https://www.championat.com/lifestyle/article-5388400-tyaga-shtangi-v-naklone-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html",
@@ -818,6 +909,7 @@ function openExerciseHelp(id) {
       : `<a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(image[3]).replaceAll("%20", "_")}" target="_blank" rel="noreferrer">${escapeHtml(image[3].replaceAll("_", " "))} · ${escapeHtml(image[1])} · ${escapeHtml(image[2])} · страница файла ↗</a>`;
     imageCredit.innerHTML = `${escapeHtml(image[4] ? image[4] + " " : "")}${imageCreditHtml}`;
   } else {
+    imageWrap.hidden = true;
     imageWrap.classList.add("is-unavailable");
     exerciseImage.hidden = true;
     exerciseImage.removeAttribute("src");
@@ -1277,7 +1369,53 @@ function showToast(message) {
   window.setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
+function renderProfileSelector() {
+  const select = document.querySelector("#profile-switcher");
+  select.innerHTML = profileRegistry.profiles.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`).join("");
+  select.value = activeProfile.id;
+  document.querySelector("#profile-name").textContent = activeProfile.name;
+  document.querySelector("#profile-avatar").textContent = activeProfile.id === "wife" ? "Ж" : "В";
+}
+
+function switchProfile(profileId) {
+  const nextProfile = profileRegistry.profiles.find((profile) => profile.id === profileId);
+  if (!nextProfile || nextProfile.id === activeProfile.id) return;
+  const openDialogs = [...document.querySelectorAll(".dialog-backdrop:not([hidden])")];
+  const bodyForm = document.querySelector("#body-form");
+  const bodyDate = bodyForm?.elements.date.value || localDateKey();
+  const savedBody = data.daily[bodyDate] || {};
+  const bodyFormHasUnsavedValues = bodyForm && (
+    bodyForm.elements.weight.value !== String(savedBody.weight || "")
+    || bodyForm.elements.waist.value !== String(savedBody.waist || "")
+  );
+  if ((openDialogs.length || bodyFormHasUnsavedValues) && !window.confirm("Есть несохранённые изменения. Переключить профиль и отбросить их?")) {
+    document.querySelector("#profile-switcher").value = activeProfile.id;
+    return;
+  }
+  if (restTimer.interval) stopTimer();
+  openDialogs.forEach((dialog) => closeDialog(dialog));
+  profileRegistry.activeProfileId = nextProfile.id;
+  activeProfile = nextProfile;
+  storageKey = activeProfile.dataKey;
+  saveProfileRegistry();
+  initializeActiveProfileData();
+  selectedCalendarDate = localDateKey();
+  calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  selectedEditorWorkout = "A";
+  editingBodyDate = null;
+  editingSessionId = null;
+  renderProfileSelector();
+  showView("overview");
+  renderOverview();
+  renderPlan();
+  renderCalendar();
+  renderBodyMetrics();
+  renderHistory();
+  window.scrollTo(0, 0);
+}
+
 function bindEvents() {
+  document.querySelector("#profile-switcher").addEventListener("change", (event) => switchProfile(event.currentTarget.value));
   document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => {
     const view = button.dataset.view;
     if (view !== "session" && data.currentSession && restTimer.interval) stopTimer();
@@ -1354,7 +1492,7 @@ function bindEvents() {
     nameInput.value = ""; summaryInput.value = ""; stepsInput.value = "";
     status.textContent = `Карточка «${name}» добавлена в каталог и план.`;
   });
-  document.querySelector("#reset-plan").addEventListener("click", () => renderEditorRows(structuredClone(defaultWorkoutPlans[selectedEditorWorkout].exercises)));
+  document.querySelector("#reset-plan").addEventListener("click", () => renderEditorRows(structuredClone(activePlanDefaults[selectedEditorWorkout].exercises)));
   document.querySelector("#plan-editor-form").addEventListener("submit", (event) => {
     event.preventDefault(); const rows = [...document.querySelectorAll(".plan-editor-row")];
     const error = document.querySelector("#plan-editor-error");
@@ -1454,8 +1592,10 @@ function importDataFile(event) {
   reader.onerror = () => showToast("Не удалось прочитать файл резервной копии.");
   reader.onload = () => {
     try {
-      const imported = validateImportedBackup(JSON.parse(String(reader.result || "")));
-      if (!window.confirm("Восстановить эту копию? Текущие записи на этом устройстве будут заменены.")) return;
+      const backup = JSON.parse(String(reader.result || ""));
+      const imported = validateImportedBackup(backup);
+      const sourceProfile = backup.profileName ? ` из профиля «${backup.profileName}»` : "";
+      if (!window.confirm(`Восстановить копию${sourceProfile} в профиль «${activeProfile.name}»? Данные этого профиля на устройстве будут заменены.`)) return;
       const previousData = data;
       const previousPlans = workoutPlans;
       data = imported;
@@ -1482,21 +1622,22 @@ function importDataFile(event) {
 }
 
 function exportData() {
-  const backup = { format: "ritm-backup", version: 1, exportedAt: new Date().toISOString(), sessions: data.sessions, currentSession: data.currentSession, daily: data.daily, scheduled: data.scheduled, plans: data.plans, exerciseLibrary: data.exerciseLibrary, programCycle: data.programCycle };
+  const backup = { format: "ritm-backup", version: 1, profileId: activeProfile.id, profileName: activeProfile.name, exportedAt: new Date().toISOString(), sessions: data.sessions, currentSession: data.currentSession, daily: data.daily, scheduled: data.scheduled, plans: data.plans, exerciseLibrary: data.exerciseLibrary, programCycle: data.programCycle };
   const contents = JSON.stringify(backup, null, 2);
   if (window.AndroidBackup) {
-    window.AndroidBackup.save(contents, `ritm-backup-${localDateKey()}.json`);
+  window.AndroidBackup.save(contents, `ritm-${activeProfile.id}-backup-${localDateKey()}.json`);
     return;
   }
   const blob = new Blob([contents], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `ritm-backup-${localDateKey()}.json`;
+  link.download = `ritm-${activeProfile.id}-backup-${localDateKey()}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
+renderProfileSelector();
 bindEvents();
 renderOverview();
 if (dataLoadWarning) showToast("Локальные данные повреждены. Если у тебя есть JSON-копия, восстанови её через кнопку внизу страницы.");

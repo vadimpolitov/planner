@@ -43,6 +43,9 @@ button { cursor: pointer; }
 
 .main-content { width: min(100% - 248px, 1440px); min-height: 100vh; margin-left: 248px; padding: 0 54px 28px; }
 .topbar { display: flex; min-height: 78px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.topbar-actions { display:flex; align-items:center; gap:9px; }
+.profile-switcher { display:flex; align-items:center; gap:6px; color:#849087; font-size:9px; }
+.profile-switcher select { min-width:145px; min-height:40px; padding:0 26px 0 10px; border:1px solid var(--line); border-radius:9px; color:#405343; background:#fff; font-size:11px; font-weight:600; }
 .today-label { display: block; color: #4f5c54; font-size: 12px; font-weight: 700; text-transform: capitalize; }
 .topbar-caption { display: block; margin-top: 3px; color: #98a099; font-size: 10px; }
 .quiet-button { display: flex; gap: 17px; align-items: center; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; color: #545e57; background: #fff; font-size: 11px; font-weight: 600; }
@@ -148,11 +151,11 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .body-grid { display: grid; grid-template-columns: minmax(270px, .75fr) minmax(0, 1.25fr); gap: 15px; align-items: stretch; }
 .body-form { margin-top: 18px; }
 .body-form input { min-height: 42px; font-size: 12px; }
-.weight-chart-panel { min-width: 0; min-height: 250px; overflow: hidden; }
+.weight-chart-panel { min-width: 0; min-height: 0; align-self: start; overflow: hidden; }
 .waist-chart-heading { margin-top: 17px; padding-top: 15px; border-top: 1px solid #edf0eb; }
 .chart-legend { display: flex; align-items: center; gap: 6px; color: #88938a; font-size: 9px; }
 .chart-legend i { width: 8px; height: 8px; border-radius: 50%; background: #82b74f; }
-.weight-chart { display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 173px; overflow: hidden; margin-top: 8px; }
+.weight-chart { display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 0; overflow: hidden; margin-top: 8px; }
 .weight-chart-svg { display: block; width: 100%; max-width: 100%; height: auto; overflow: hidden; }
 .chart-grid-line { stroke: #edf0eb; stroke-width: 1; }
 .chart-axis-label, .chart-date-label { fill: #9ba39d; font-family: "DM Sans", sans-serif; font-size: 10px; }
@@ -162,7 +165,7 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .chart-point { fill: #fff; stroke: #82b74f; stroke-width: 2.5; }
 .chart-point.waist-chart-line { stroke: #578db5; }
 .waist-legend i { background: #578db5; }
-.chart-summary { display: flex; width: 100%; min-width: 0; box-sizing: border-box; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #f5f8f2; }
+.chart-summary { display: flex; width: 100%; min-width: 0; min-height: 0; height: auto; align-self: flex-start; flex: 0 0 auto; box-sizing: border-box; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #f5f8f2; }
 .chart-summary-value { flex: 1 1 180px; min-width: 0; color: #607650; font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
 .chart-summary-value.trend-up { color: #9a6744; }
 .chart-summary-value.trend-down { color: #527b48; }
@@ -297,6 +300,9 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 @media (max-width: 620px) {
   .main-content { padding-right: 17px; padding-left: 17px; }
   .topbar { min-height: 65px; }
+  .topbar-actions { gap:6px; }
+  .profile-switcher > span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+  .profile-switcher select { width:122px; min-width:0; min-height:38px; padding-left:8px; font-size:10px; }
   .view { padding-top: 26px; }
   .page-heading { margin-bottom: 19px; }
   .page-heading h1 { font-size: 26px; }
@@ -327,8 +333,8 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
   .body-stat-card > strong { margin-top: 11px; font-size: 20px; }
   .body-stat-card > p { font-size: 9px; line-height: 1.45; }
   .body-grid { grid-template-columns: 1fr; }
-  .weight-chart-panel { min-height: 220px; }
-  .weight-chart { min-height: 150px; }
+  .weight-chart-panel { min-height: 0; }
+  .weight-chart { min-height: 0; }
   .chart-summary { align-items: flex-start; flex-direction: column; gap: 3px; padding: 8px; }
   .chart-summary-value { font-size: 10px; }
   .chart-summary-period { font-size: 8px; text-align: left; }

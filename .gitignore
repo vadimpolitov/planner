@@ -1,0 +1,8 @@
+work/android-toolchain/
+android/.gradle/
+android/**/build/
+android/local.properties
+outputs/*.apk
+images/exercises/*
+!images/exercises/open-source/
+!images/exercises/open-source/**
