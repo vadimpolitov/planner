@@ -1,4 +1,4 @@
-const CACHE_NAME = "ritm-app-shell-v3";
+const CACHE_NAME = "ritm-app-shell-v4";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -20,6 +20,7 @@ const APP_FILES = [
   "./images/exercises/open-source/dumbbell-romanian-deadlift.svg",
   "./images/exercises/open-source/barbell-hip-thrust.svg",
   "./images/exercises/open-source/incline-dumbbell-press.svg",
+  "./images/exercises/open-source/cable-leg-curl.svg",
   "./images/exercises/open-source/incline-press.png",
   "./images/exercises/open-source/lateral-raise.png",
   "./images/exercises/open-source/leg-curl.png",

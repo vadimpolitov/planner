@@ -211,6 +211,7 @@ const exerciseImages = {
   "dumbbell-romanian-deadlift": ["open-source/dumbbell-romanian-deadlift.svg", "Everkinetic", "CC BY-SA 3.0", "Dumbbell dead lifts 2.svg", "Иллюстрация тазового наклона с гантелями.", "https://commons.wikimedia.org/wiki/File:Dumbbell_dead_lifts_2.svg"],
   "barbell-hip-thrust": ["open-source/barbell-hip-thrust.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация ягодичного моста со штангой.", "https://bryllim.github.io/workout-guide/exercises/hip-thrust/"],
   "dumbbell-incline-press": ["open-source/incline-dumbbell-press.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация жима гантелей на наклонной скамье.", "https://bryllim.github.io/workout-guide/exercises/incline-dumbbell-press/"],
+  "cable-leg-curl": ["open-source/cable-leg-curl.svg", "Ритм", "Авторская иллюстрация", "", "Сгибание ноги стоя с манжетой и нижним блоком.", ""],
   deadlift: ["championat/deadlift.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5310910-stanovaya-tyaga-normativy-tehnika-vypolneniya-vidy-stanovoj-tyagi.html"],
   "incline-press": ["championat/incline-press.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5782466-zhim-shtangi-na-naklonnoj-skame-tehnika-vypolneniya-kakie-myshcy-rabotayut.html"],
   "lat-pulldown": ["championat/lat-pulldown.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5404742-tyaga-verhnego-bloka-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html"],
@@ -912,7 +913,9 @@ function openExerciseHelp(id) {
     exerciseImage.alt = `Иллюстрация: ${h[0]}`;
     const imageCreditHtml = image[5]
       ? `<a href="${escapeHtml(image[5])}" target="_blank" rel="noreferrer">${escapeHtml(image[1])} · ${escapeHtml(image[2])} · источник ↗</a>`
-      : `<a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(image[3]).replaceAll("%20", "_")}" target="_blank" rel="noreferrer">${escapeHtml(image[3].replaceAll("_", " "))} · ${escapeHtml(image[1])} · ${escapeHtml(image[2])} · страница файла ↗</a>`;
+      : image[2] === "Авторская иллюстрация"
+        ? `${escapeHtml(image[1])} · ${escapeHtml(image[2])}`
+        : `<a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(image[3]).replaceAll("%20", "_")}" target="_blank" rel="noreferrer">${escapeHtml(image[3].replaceAll("_", " "))} · ${escapeHtml(image[1])} · ${escapeHtml(image[2])} · страница файла ↗</a>`;
     imageCredit.innerHTML = `${escapeHtml(image[4] ? image[4] + " " : "")}${imageCreditHtml}`;
   } else {
     imageWrap.hidden = true;
