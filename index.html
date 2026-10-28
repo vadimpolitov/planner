@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
     <script>try { document.documentElement.dataset.theme = localStorage.getItem("ritm-theme") === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }</script>
-    <link rel="stylesheet" href="style.css?v=3.5" />
+    <link rel="stylesheet" href="style.css?v=3.6" />
   </head>
   <body>
     <div class="app-shell">
@@ -155,6 +155,19 @@
         <form id="plan-editor-form" class="dialog-form"><input type="hidden" name="workout" /><p id="plan-editor-error" class="form-status dialog-error" role="alert" hidden></p><label class="exercise-search-label">Поиск упражнения<input id="exercise-library-search" type="search" placeholder="Название или группа мышц" autocomplete="off" /></label><div id="plan-editor-rows" class="plan-editor-rows"></div><div class="editor-actions"><button class="secondary-button" id="add-exercise" type="button">＋ Добавить из каталога</button><button class="text-button" id="reset-plan" type="button">Вернуть исходный план</button></div><details class="exercise-library-create"><summary id="exercise-library-title">＋ Добавить свою карточку</summary><div class="exercise-library-content"><p>Карточки сохраняются в каталоге активного профиля и доступны в обоих его планах.</p><div class="exercise-library-fields"><label>Название упражнения<input id="new-exercise-name" maxlength="80" placeholder="Например, тяга гантели одной рукой" /></label><label>Краткая подсказка, необязательно<input id="new-exercise-summary" maxlength="180" placeholder="На что обратить внимание" /></label><label>Техника выполнения, необязательно<textarea id="new-exercise-steps" rows="3" maxlength="700" placeholder="Кратко опиши шаги выполнения"></textarea></label></div><button class="secondary-button" id="save-exercise-card" type="button">＋ Добавить карточку</button><p id="exercise-library-status" class="form-status" role="status" aria-live="polite"></p></div></details><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="plan-editor-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить план</button></div></form>
       </section>
     </div>
+    <div class="dialog-backdrop" id="replace-exercise-dialog" hidden>
+      <section class="app-dialog replace-exercise-dialog" role="dialog" aria-modal="true" aria-labelledby="replace-exercise-title">
+        <button class="dialog-close" type="button" data-close-dialog="replace-exercise-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">ТЕКУЩАЯ ТРЕНИРОВКА</p><h2 id="replace-exercise-title">Заменить упражнение</h2>
+        <p class="dialog-description">Выбери упражнение из каталога. Подходы, диапазон повторов и отдых останутся прежними; основной план не изменится.</p>
+        <form id="replace-exercise-form" class="dialog-form">
+          <label>Поиск<input id="replace-exercise-search" type="search" autocomplete="off" placeholder="Название упражнения" /></label>
+          <label>Упражнение<select id="replace-exercise-select" required></select></label>
+          <p id="replace-exercise-status" class="form-status" aria-live="polite"></p>
+          <div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="replace-exercise-dialog">Отмена</button><button class="primary-button" type="submit">Заменить</button></div>
+        </form>
+      </section>
+    </div>
     <div class="dialog-backdrop" id="session-editor-dialog" hidden>
       <section class="app-dialog session-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="session-editor-title">
         <button class="dialog-close" type="button" data-close-dialog="session-editor-dialog" aria-label="Закрыть">×</button>
@@ -196,6 +209,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=3.5"></script>
+    <script src="script.js?v=3.6"></script>
   </body>
 </html>

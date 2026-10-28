@@ -203,6 +203,7 @@ let selectedCalendarDate = localDateKey();
 let selectedEditorWorkout = "A";
 let editingBodyDate = null;
 let editingSessionId = null;
+let replacingExerciseIndex = null;
 const exerciseHelp = {
   squat: ["Присед со штангой", "Приседай только в той глубине, где сохраняешь устойчивую стопу и положение спины.", "Настрой стойки примерно на высоте середины груди; расположи гриф на верхней части спины, а не на шее; возьмись симметрично и собери лопатки.; Сними гриф, отступи коротко и поставь стопы в устойчивую ширину; вдохни животом и напряги корпус кругом.; Начни одновременно сгибать колени и таз; колени веди в направлении носков, пятки и основание большого пальца оставляй прижатыми.; Опускайся до глубины, на которой не теряешь равновесие и контроль таза; не ищи глубину ценой боли или округления поясницы.; Оттолкнись всей стопой и поднимись; колени продолжают смотреть в сторону носков, корпус не раскачивай.; Сбрось вдох после трудной части повтора; между повторами восстанови напряжение. Частые ошибки: пятки отрываются, колени резко заваливаются внутрь, гриф уходит от середины стопы.", "Начни с пустого грифа и используй страховочные упоры, выставленные чуть ниже нижней точки приседа."],
   bench: ["Жим лёжа", "Поставь тело устойчиво и опускай гриф по контролируемой траектории к нижней части груди.", "Ляг так, чтобы глаза были примерно под грифом; стопы полностью на полу, голова и таз остаются на скамье.; Возьмись симметрично чуть шире плеч; сведи лопатки и мягко прижми их к скамье, сохраняя естественный прогиб.; Сними гриф над плечами; вдохни и опускай его плавно к нижней части груди, удерживая запястья над локтями.; Локти направляй по диагонали относительно корпуса, не разводи их строго в стороны; предплечья внизу близки к вертикали.; Выжми гриф вверх и немного назад к положению над плечами; не отбивай от груди и не отрывай таз.; Выдыхай во время выжима. Ошибки: неровный хват, потерянные лопатки, резкий отскок, боль в плече.", "Используй страховочные упоры или страхующего; прекращай подход, если штанга перестаёт двигаться под контролем."],
@@ -1145,7 +1146,7 @@ function renderExercise(exercise, index, entry) {
   }).join("");
   const difference = compareExerciseSets(entry, lastExerciseEntry(name));
   const comparison = difference === null ? "" : difference > 0 ? `↑ На ${difference} повторов больше при тех же весах` : difference === 0 ? "Результат совпадает с прошлым при тех же весах" : `На ${Math.abs(difference)} повторов меньше при тех же весах`;
-  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><p class="exercise-comparison" aria-live="polite" ${comparison ? "" : "hidden"}>${escapeHtml(comparison)}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
+  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><button class="replace-exercise-button" type="button" data-replace-exercise="${index}" aria-label="Заменить упражнение ${escapeHtml(name)}">Заменить упражнение</button><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><p class="exercise-comparison" aria-live="polite" ${comparison ? "" : "hidden"}>${escapeHtml(comparison)}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
 }
 
 function openValuePicker(trigger) {
@@ -1188,8 +1189,75 @@ function openValuePicker(trigger) {
   });
 }
 
+function entryHasRecordedWork(entry) {
+  return Boolean(entry.completed || entry.sets.some((set) => String(set.weight ?? "").trim() !== "" || String(set.reps ?? "").trim() !== ""));
+}
+
+function renderReplacementOptions() {
+  const query = exerciseNameKey(document.querySelector("#replace-exercise-search").value);
+  const select = document.querySelector("#replace-exercise-select");
+  const oldSelection = select.value;
+  const cards = [...data.exerciseLibrary].filter((card) => exerciseNameKey(`${card.name} ${exerciseLibraryCategory(card)}`).includes(query))
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const groups = ["Ноги", "Верх тела", "Изоляция и корпус", "Другие упражнения", "Мои упражнения"].map((category) => {
+    const items = cards.filter((card) => exerciseLibraryCategory(card) === category);
+    return items.length ? `<optgroup label="${category}">${items.map((card) => `<option value="${escapeHtml(card.id)}">${escapeHtml(card.name)}</option>`).join("")}</optgroup>` : "";
+  }).join("");
+  select.innerHTML = `<option value="">${cards.length ? "Выбери упражнение" : "Ничего не найдено"}</option>${groups}`;
+  if (cards.some((card) => card.id === oldSelection)) select.value = oldSelection;
+  document.querySelector("#replace-exercise-status").textContent = cards.length ? "" : "Попробуй изменить запрос.";
+}
+
+function openExerciseReplacement(index) {
+  const invalid = [...document.querySelectorAll("[data-set-field]")].find((input) => !input.validity.valid);
+  if (invalid) { invalid.focus(); showToast("Сначала исправь некорректное значение подхода."); return; }
+  if (!data.currentSession?.entries[index]) return;
+  replacingExerciseIndex = index;
+  document.querySelector("#replace-exercise-search").value = "";
+  document.querySelector("#replace-exercise-select").innerHTML = "";
+  renderReplacementOptions();
+  showDialog("replace-exercise-dialog");
+}
+
+function replaceExercise(event) {
+  event.preventDefault();
+  const index = replacingExerciseIndex;
+  const draft = data.currentSession;
+  const card = data.exerciseLibrary.find((item) => item.id === document.querySelector("#replace-exercise-select").value);
+  if (!draft || index === null || !card || !draft.entries[index]) return;
+  const plan = draft.planSnapshot || structuredClone(workoutPlans[draft.workout]);
+  const current = plan.exercises[index];
+  const entry = draft.entries[index];
+  if (!current) return;
+  const currentName = (current.options || [current.name])[entry.optionIndex] || current.name;
+  if (exerciseNameKey(currentName) === exerciseNameKey(card.name)) {
+    closeDialog(document.querySelector("#replace-exercise-dialog"));
+    return;
+  }
+  if (entryHasRecordedWork(entry) && !window.confirm("В этом упражнении уже есть введённые подходы или отметка выполнения. При замене они будут удалены. Продолжить?")) return;
+  const previousSnapshot = draft.planSnapshot;
+  const previousEntry = structuredClone(entry);
+  const newPlan = structuredClone(plan);
+  const replacement = { ...structuredClone(card), name: card.name, sets: current.sets, min: current.min, max: current.max, rest: current.rest };
+  delete replacement.options;
+  delete replacement.optionHelpIds;
+  newPlan.exercises[index] = replacement;
+  draft.planSnapshot = newPlan;
+  draft.entries[index] = { optionIndex: 0, completed: false, sets: Array.from({ length: Number(current.sets) }, () => ({ weight: "", reps: "" })) };
+  if (!saveData()) { draft.planSnapshot = previousSnapshot; draft.entries[index] = previousEntry; return; }
+  if (restTimer.activeIndex === index && (restTimer.interval || restTimer.finished)) stopTimer();
+  const scrollPosition = window.scrollY;
+  closeDialog(document.querySelector("#replace-exercise-dialog"));
+  replacingExerciseIndex = null;
+  renderSession();
+  window.scrollTo(0, scrollPosition);
+  document.querySelector(`[data-replace-exercise="${index}"]`)?.focus({ preventScroll: true });
+  showToast("Упражнение заменено только в этой тренировке.");
+}
+
 function bindSessionEvents() {
   bindHelpLinks();
+  document.querySelectorAll("[data-replace-exercise]").forEach((button) => button.addEventListener("click", () => openExerciseReplacement(Number(button.dataset.replaceExercise))));
   document.querySelectorAll("[data-value-picker]").forEach((button) => button.addEventListener("click", () => openValuePicker(button)));
   const timerPreset = document.querySelector("#timer-preset");
   timerPreset.value = timerPresetSeconds;
@@ -1235,9 +1303,19 @@ function bindSessionEvents() {
     comparison.textContent = delta === null ? "" : delta > 0 ? `↑ На ${delta} повторов больше при тех же весах` : delta === 0 ? "Результат совпадает с прошлым при тех же весах" : `На ${Math.abs(delta)} повторов меньше при тех же весах`;
   }));
   document.querySelectorAll("[data-variant]").forEach((select) => select.addEventListener("change", () => {
-    data.currentSession.entries[Number(select.dataset.variant)].optionIndex = Number(select.value);
-    saveData();
+    const index = Number(select.dataset.variant);
+    const entry = data.currentSession.entries[index];
+    const old = structuredClone(entry);
+    const invalid = [...document.querySelectorAll("[data-set-field]")].find((input) => !input.validity.valid);
+    if (invalid) { select.value = String(old.optionIndex); invalid.focus(); showToast("Сначала исправь некорректное значение подхода."); return; }
+    if (entryHasRecordedWork(entry) && !window.confirm("В упражнении уже есть подходы или отметка выполнения. При смене варианта они будут удалены. Продолжить?")) { select.value = String(entry.optionIndex); return; }
+    entry.optionIndex = Number(select.value);
+    entry.completed = false;
+    entry.sets = entry.sets.map(() => ({ weight: "", reps: "" }));
+    if (!saveData()) { data.currentSession.entries[index] = old; select.value = String(old.optionIndex); return; }
+    const scrollPosition = window.scrollY;
     renderSession();
+    window.scrollTo(0, scrollPosition);
   }));
   document.querySelector("#effort-input").addEventListener("input", (event) => {
     data.currentSession.effort = event.target.value;
@@ -1790,6 +1868,8 @@ function applyTheme(theme) {
 }
 
 function bindEvents() {
+  document.querySelector("#replace-exercise-search").addEventListener("input", renderReplacementOptions);
+  document.querySelector("#replace-exercise-form").addEventListener("submit", replaceExercise);
   document.querySelector("#theme-toggle").addEventListener("click", () => {
     const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     applyTheme(theme);

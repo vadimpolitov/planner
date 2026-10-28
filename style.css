@@ -862,6 +862,11 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .history-tabs[hidden] { display:none; }
 [data-set-field][aria-invalid="true"] { border-color:#bf4c3e; outline:2px solid #bf4c3e; }
 @media(max-width:620px) { .profile-switcher select { width:145px; } }
+
+.replace-exercise-button { min-height:44px; margin:5px 0 0; padding:7px 11px; border:1px solid var(--line); border-radius:9px; color:#4c7139; background:transparent; font-size:12px; font-weight:700; }
+.replace-exercise-button:hover { background:#edf5e8; }
+:root[data-theme="dark"] .replace-exercise-button { color:#c5e8ac; border-color:#45604a; }
+:root[data-theme="dark"] .replace-exercise-button:hover { background:#304a35; }
 :root[data-theme="dark"] .profile-switcher select { color:#e4f0e5; }
 :root[data-theme="dark"] .body-stat-card > strong small { color:#b5c4b8; }
 :root[data-theme="dark"] .plan-editor-row > summary::after { color:#b5c4b8; }
