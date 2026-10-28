@@ -3,7 +3,7 @@ const profileRegistryKey = `${storageKeyBase}-profiles`;
 let profileRegistry = null;
 let activeProfile = null;
 let storageKey = storageKeyBase;
-const restTimer = { interval: null, remaining: 0, activeButton: null };
+const restTimer = { interval: null, remaining: 0, endAt: 0, duration: 0, activeIndex: null, finished: false };
 let timerAudioContext = null;
 let timerPresetManuallyChanged = false;
 let timerPresetSeconds = "150";
@@ -260,13 +260,12 @@ const muscleWikiExercisePages = {
   "dumbbell-incline-press": "dumbbell-incline-bench-press",
   deadlift: "barbell-deadlift",
   "incline-press": "barbell-incline-bench-press",
-  "lat-pulldown": "cable-lat-pulldown",
+  "lat-pulldown": "machine-pulldown",
   pullup: "pull-ups",
   "split-squat": "dumbbell-bulgarian-split-squat",
   "lateral-raise": "dumbbell-lateral-raise",
   "side-plank": "elbow-side-plank",
   "leg-press": "machine-leg-press",
-  "cable-leg-curl": "cable-single-leg-laying-leg-curl",
 };
 
 const muscleWikiExerciseCategories = {
@@ -661,9 +660,10 @@ function renderMetricChart(entries, field, containerId, unit, label, colorClass)
   const metricEntries = entries.filter(([, entry]) => Number(entry[field]) > 0).slice(-14);
   const container = document.querySelector(`#${containerId}`);
   const summary = document.querySelector(`#${field === "weight" ? "weight" : "waist"}-trend`);
+  summary.hidden = !metricEntries.length;
   if (!metricEntries.length) {
     summary.innerHTML = "";
-    container.innerHTML = `<div class="chart-empty"><span>⌁</span><p>Добавь запись ${label.toLocaleLowerCase("ru-RU")}, чтобы увидеть динамику.</p></div>`;
+    container.innerHTML = `<div class="chart-empty"><p>Добавь ${field === "weight" ? "замер веса" : "замер талии"}, чтобы увидеть динамику.</p></div>`;
     return;
   }
   const values = metricEntries.map(([, entry]) => Number(entry[field]));
@@ -709,6 +709,10 @@ function renderMetricChart(entries, field, containerId, unit, label, colorClass)
 
 function renderBodyMetrics() {
   const entries = getBodyEntries();
+  document.querySelector("#body-stats").hidden = !entries.length;
+  document.querySelector("#body-empty").hidden = Boolean(entries.length);
+  document.querySelector("#body-charts").hidden = !entries.length;
+  document.querySelector("#measurement-history").hidden = !entries.length;
   const recentWeight = entries.filter(([, entry]) => Number(entry.weight) > 0).slice(-2).reverse();
   const recentWaist = entries.filter(([, entry]) => Number(entry.waist) > 0).slice(-2).reverse();
   const currentWeight = recentWeight[0]?.[1].weight;
@@ -819,7 +823,7 @@ function openPlanEditor(type) {
   selectedEditorWorkout = type;
   const form = document.querySelector("#plan-editor-form");
   form.elements.workout.value = type;
-  document.querySelector("#plan-editor-title").textContent = `Изменить ${workoutPlans[type].name.toLowerCase()}`;
+  document.querySelector("#plan-editor-title").textContent = `Изменить тренировку ${type === "B" ? "Б" : "А"}`;
   document.querySelector("#exercise-library-search").value = "";
   renderEditorRows(structuredClone(workoutPlans[type].exercises));
   document.querySelector("#plan-editor-error").hidden = true;
@@ -828,9 +832,9 @@ function openPlanEditor(type) {
 }
 
 function editorRowValues() {
-  return [...document.querySelectorAll(".plan-editor-row")].map((row) => Object.fromEntries(
+  return [...document.querySelectorAll(".plan-editor-row")].map((row) => ({ ...Object.fromEntries(
     ["exerciseId", "sets", "min", "max", "rest"].map((name) => [name, row.querySelector(`[name=${name}]`).value]),
-  ));
+  ), _open: row.open }));
 }
 
 function exerciseLibraryCategory(card) {
@@ -858,13 +862,17 @@ function renderEditorRows(exercises) {
     }).join("");
     const preview = selected?.summary || selected?.steps?.split(/[;.\n]/)[0]?.trim()
       || exerciseHelp[selected?.helpId]?.[1] || "Подробная справка доступна по значку ⓘ после сохранения плана.";
-    return `<div class="plan-editor-row"><label>Упражнение<select name="exerciseId" required><option value="">Выбери из каталога</option>${groups}</select></label>${selected ? `<p class="exercise-card-preview"><span>${selected.custom ? "МОЯ КАРТОЧКА" : exerciseLibraryCategory(selected).toLocaleUpperCase("ru-RU")}</span>${escapeHtml(preview)}</p>` : ""}<div class="editor-number-fields"><label>Подходы<input name="sets" type="number" min="1" max="10" value="${escapeHtml(exercise.sets ?? 3)}" required /></label><label>От<input name="min" type="number" min="1" max="50" value="${escapeHtml(exercise.min ?? 8)}" required /></label><label>До<input name="max" type="number" min="1" max="50" value="${escapeHtml(exercise.max ?? 12)}" required /></label></div><label>Отдых<select name="rest"><option value="long" ${exercise.rest === "long" ? "selected" : ""}>2–3 минуты</option><option value="short" ${exercise.rest !== "long" ? "selected" : ""}>60–90 секунд</option></select></label><button class="danger-text-button" type="button" data-remove-editor-row="${index}">Удалить упражнение</button></div>`;
+    return `<details class="plan-editor-row" ${exercise._open || !selected ? "open" : ""}><summary><span class="editor-row-title">${escapeHtml(selected?.name || "Выбери упражнение")}</span><span class="editor-row-meta">${escapeHtml(exercise.sets ?? 3)} × ${escapeHtml(exercise.min ?? 8)}–${escapeHtml(exercise.max ?? 12)}</span></summary><div class="editor-row-content"><label>Упражнение<select name="exerciseId" required><option value="">Выбери из каталога</option>${groups}</select></label>${selected ? `<p class="exercise-card-preview"><span>${selected.custom ? "МОЯ КАРТОЧКА" : exerciseLibraryCategory(selected).toLocaleUpperCase("ru-RU")}</span>${escapeHtml(preview)}</p>` : ""}<div class="editor-number-fields"><label>Подходы<input name="sets" type="number" min="1" max="10" value="${escapeHtml(exercise.sets ?? 3)}" required /></label><label>От<input name="min" type="number" min="1" max="50" value="${escapeHtml(exercise.min ?? 8)}" required /></label><label>До<input name="max" type="number" min="1" max="50" value="${escapeHtml(exercise.max ?? 12)}" required /></label></div><label>Отдых<select name="rest"><option value="long" ${exercise.rest === "long" ? "selected" : ""}>2–3 минуты</option><option value="short" ${exercise.rest !== "long" ? "selected" : ""}>60–90 секунд</option></select></label><button class="danger-text-button" type="button" data-remove-editor-row="${index}">Удалить упражнение</button></div></details>`;
   }).join("");
   document.querySelectorAll("[data-remove-editor-row]").forEach((button) => button.addEventListener("click", () => {
-    exercises.splice(Number(button.dataset.removeEditorRow), 1);
-    renderEditorRows(exercises);
+    const values = editorRowValues();
+    values.splice(Number(button.dataset.removeEditorRow), 1);
+    renderEditorRows(values);
   }));
   document.querySelectorAll('.plan-editor-row select[name="exerciseId"]').forEach((select) => select.addEventListener("change", () => renderEditorRows(editorRowValues())));
+  document.querySelectorAll(".plan-editor-row").forEach((row) => row.addEventListener("input", () => {
+    row.querySelector(".editor-row-meta").textContent = `${row.querySelector('[name="sets"]').value} × ${row.querySelector('[name="min"]').value}–${row.querySelector('[name="max"]').value}`;
+  }));
 }
 
 function openExerciseHelp(id) {
@@ -886,11 +894,12 @@ function openExerciseHelp(id) {
   const muscleWikiLink = document.querySelector("#exercise-musclewiki-link");
   muscleWikiCard.hidden = false;
   muscleWikiLink.href = muscleWikiUrl;
+  muscleWikiLink.target = window.AndroidBackup ? "_self" : "_blank";
   muscleWikiLink.textContent = muscleWikiSlug ? "Анимация и описание на MuscleWiki ↗" : "Открыть библиотеку MuscleWiki ↗";
   document.querySelector("#exercise-musclewiki-note").textContent = muscleWikiSlug
-    ? "На странице MuscleWiki доступны демонстрация движения и инструкция по шагам."
+    ? "Анимация и инструкция откроются на сайте MuscleWiki. Нужен интернет."
     : muscleWikiCategory
-      ? "Точной карточки этого варианта в каталоге не нашёл. Открой раздел по целевой группе и выбери ближайшее упражнение."
+      ? "Точной карточки этого варианта нет. На сайте MuscleWiki можно выбрать похожее упражнение. Нужен интернет."
       : `Найди «${h[0]}» в библиотеке MuscleWiki: на страницах упражнений есть демонстрации и инструкции.`;
   document.querySelector("#exercise-dialog-title").textContent = h[0];
   document.querySelector("#exercise-dialog-summary").textContent = h[1];
@@ -957,8 +966,9 @@ function renderSession() {
   if (!draft) return showView("overview");
   const plan = draft.planSnapshot || workoutPlans[draft.workout];
   document.querySelector("#session-date").textContent = formatDate(draft.date, { day: "numeric", month: "long", year: "numeric" });
-  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><div class="warmup-card"><span>↗</span><p><strong>Разминка</strong> · 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></div><div class="session-tools"><span>Записывай рабочие веса и повторения. Таймер подаст звуковой сигнал.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button">◷ <span id="timer-label">Запустить отдых</span></button></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
+  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><div class="warmup-card"><span>↗</span><p><strong>Разминка</strong> · 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></div><div class="session-tools"><span>Записывай подходы · таймер со звуком.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
   bindSessionEvents();
+  if (restTimer.interval || restTimer.finished) updateRestTimer();
 }
 
 function renderExercise(exercise, index, entry) {
@@ -1029,63 +1039,81 @@ function bindSessionEvents() {
     saveData();
   }));
   document.querySelectorAll(".inline-timer").forEach((button) => button.addEventListener("click", () => {
-    if (restTimer.activeButton === button && restTimer.interval) stopTimer();
+    if (restTimer.activeIndex === Number(button.closest("[data-exercise-card]").dataset.exerciseCard) && restTimer.interval) stopTimer();
     else startTimer(button.dataset.rest, button);
   }));
   document.querySelector("#timer-button").addEventListener("click", () => restTimer.interval ? stopTimer() : startTimer("long"));
   document.querySelector("#finish-workout").addEventListener("click", requestFinishWorkout);
   document.querySelector("#cancel-workout").addEventListener("click", cancelCurrentWorkout);
-  document.querySelector("#save-partial-workout").addEventListener("click", () => {
-    closeDialog(document.querySelector("#finish-dialog"));
-    finishWorkout(true);
-  });
 }
 
 function stopTimer() {
   clearInterval(restTimer.interval);
   restTimer.interval = null;
-  if (restTimer.activeButton) restTimer.activeButton.textContent = "Запустить отдых";
-  restTimer.activeButton = null;
+  restTimer.endAt = 0;
+  restTimer.activeIndex = null;
+  restTimer.finished = false;
+  document.querySelectorAll(".inline-timer").forEach((button) => { button.textContent = "Запустить отдых"; });
+  const display = document.querySelector("#timer-display");
+  if (display) display.hidden = true;
   const label = document.querySelector("#timer-label");
   if (label) label.textContent = "Запустить отдых";
   document.querySelector("#timer-button")?.classList.remove("timer-running");
 }
+
+function updateRestTimer() {
+  if (!restTimer.interval && !restTimer.finished) return;
+  const remaining = restTimer.interval ? Math.max(0, Math.ceil((restTimer.endAt - Date.now()) / 1000)) : 0;
+  restTimer.remaining = remaining;
+  if (restTimer.interval && remaining === 0) {
+    clearInterval(restTimer.interval);
+    restTimer.interval = null;
+    restTimer.finished = true;
+    playTimerSignal();
+    showToast("Время отдыха закончилось");
+  }
+  const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const seconds = String(remaining % 60).padStart(2, "0");
+  const display = document.querySelector("#timer-display");
+  const status = document.querySelector("#timer-status");
+  const time = document.querySelector("#timer-time");
+  const progress = document.querySelector("#timer-progress");
+  const button = document.querySelector("#timer-button");
+  const label = document.querySelector("#timer-label");
+  if (display) { display.hidden = false; display.classList.toggle("timer-finished", restTimer.finished); }
+  if (status) status.textContent = restTimer.finished ? "Отдых завершён" : "Отдых";
+  if (time) time.textContent = `${minutes}:${seconds}`;
+  if (progress) progress.style.width = `${restTimer.duration ? Math.min(100, remaining / restTimer.duration * 100) : 0}%`;
+  if (button) button.classList.toggle("timer-running", Boolean(restTimer.interval));
+  if (label) label.textContent = restTimer.finished ? "Начать снова" : "Остановить";
+  document.querySelectorAll(".inline-timer").forEach((inline) => {
+    const index = Number(inline.closest("[data-exercise-card]").dataset.exerciseCard);
+    inline.textContent = index === restTimer.activeIndex
+      ? (restTimer.finished ? "Отдых завершён · снова" : `${minutes}:${seconds} · стоп`)
+      : "Запустить отдых";
+  });
+}
+
 function startTimer(restType, sourceButton = null) {
   clearInterval(restTimer.interval);
-  if (restTimer.activeButton) restTimer.activeButton.textContent = "Запустить отдых";
-  restTimer.activeButton = sourceButton;
   const preset = document.querySelector("#timer-preset");
   if (!timerPresetManuallyChanged) preset.value = restType === "short" ? "75" : "150";
   timerPresetSeconds = preset.value;
-  restTimer.remaining = Number(preset.value);
+  restTimer.duration = Number(preset.value);
+  restTimer.remaining = restTimer.duration;
+  restTimer.endAt = Date.now() + restTimer.duration * 1000;
+  restTimer.activeIndex = sourceButton ? Number(sourceButton.closest("[data-exercise-card]").dataset.exerciseCard) : null;
+  restTimer.finished = false;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (AudioContextClass && !timerAudioContext) timerAudioContext = new AudioContextClass();
   timerAudioContext?.resume().catch(() => {});
-  const label = document.querySelector("#timer-label");
-  document.querySelector("#timer-button").classList.add("timer-running");
-  const tick = () => {
-    const minutes = String(Math.floor(restTimer.remaining / 60)).padStart(2, "0");
-    const seconds = String(restTimer.remaining % 60).padStart(2, "0");
-    if (label) label.textContent = `${minutes}:${seconds} · остановить`;
-    if (restTimer.activeButton) restTimer.activeButton.textContent = `${minutes}:${seconds} · стоп`;
-    if (restTimer.remaining <= 0) {
-      clearInterval(restTimer.interval);
-      restTimer.interval = null;
-      document.querySelector("#timer-button").classList.remove("timer-running");
-      if (restTimer.activeButton) {
-        restTimer.activeButton.textContent = "Отдых завершён · снова";
-        restTimer.activeButton = null;
-      }
-      if (label) label.textContent = "Отдых завершён · повторить";
-      playTimerSignal();
-      showToast("Время отдыха закончилось");
-        return;
-    }
-    restTimer.remaining -= 1;
-  };
-  tick();
-  restTimer.interval = setInterval(tick, 1000);
+  restTimer.interval = setInterval(updateRestTimer, 250);
+  updateRestTimer();
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && restTimer.interval) updateRestTimer();
+});
 
 function playTimerSignal() {
   if (!timerAudioContext) return;
@@ -1418,6 +1446,10 @@ function bindEvents() {
     renderCalendar();
     window.scrollTo(0, 0);
   });
+  document.querySelector("#save-partial-workout").addEventListener("click", () => {
+    closeDialog(document.querySelector("#finish-dialog"));
+    finishWorkout(true);
+  });
   document.querySelector("#session-editor-form").addEventListener("submit", saveSessionEdit);
   document.querySelector("#cancel-session-edit").addEventListener("click", () => { editingSessionId = null; });
   document.querySelector("#program-editor-form").addEventListener("submit", saveProgramEdit);
@@ -1443,7 +1475,7 @@ function bindEvents() {
   bindDialogKeyboardControls();
   document.querySelector("#add-exercise").addEventListener("click", () => {
     const rows = editorRowValues();
-    rows.push({ exerciseId: "", sets: 3, min: 8, max: 12, rest: "short" });
+    rows.push({ exerciseId: "", sets: 3, min: 8, max: 12, rest: "short", _open: true });
     renderEditorRows(rows);
   });
   document.querySelector("#exercise-library-search").addEventListener("input", () => renderEditorRows(editorRowValues()));
@@ -1468,12 +1500,16 @@ function bindEvents() {
     data.exerciseLibrary = [...data.exerciseLibrary, card];
     if (!saveData()) { data.exerciseLibrary = previousLibrary; return; }
     const rows = editorRowValues();
-    rows.push({ exerciseId: cardId, sets: 3, min: 8, max: 12, rest: "short" });
+    rows.push({ exerciseId: cardId, sets: 3, min: 8, max: 12, rest: "short", _open: true });
     renderEditorRows(rows);
     nameInput.value = ""; summaryInput.value = ""; stepsInput.value = "";
     status.textContent = `Карточка «${name}» добавлена в каталог и план.`;
   });
   document.querySelector("#reset-plan").addEventListener("click", () => renderEditorRows(structuredClone(activePlanDefaults[selectedEditorWorkout].exercises)));
+  document.querySelector("#plan-editor-form").addEventListener("invalid", (event) => {
+    const row = event.target.closest(".plan-editor-row");
+    if (row) row.open = true;
+  }, true);
   document.querySelector("#plan-editor-form").addEventListener("submit", (event) => {
     event.preventDefault(); const rows = [...document.querySelectorAll(".plan-editor-row")];
     const error = document.querySelector("#plan-editor-error");
