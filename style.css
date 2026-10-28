@@ -709,3 +709,28 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 @media(max-width:620px) {
   .finish-row { position:static; padding:12px; }
 }
+
+/* Value picker for workout sets */
+.set-field > label { display:none; }
+.set-value-control { display:flex; min-width:0; align-items:stretch; gap:4px; }
+.set-value-control input { flex:1 1 0; width:0; min-width:0; }
+.value-picker-trigger { display:grid; flex:0 0 44px; min-width:44px; min-height:44px; place-items:center; padding:0; border:1px solid #d7e4d1; border-radius:8px; color:#42643b; background:#f1f8ed; font-size:20px; }
+.value-picker-trigger:hover { background:#e4f1dc; }
+.value-picker-dialog { width:min(600px,100%); }
+.value-picker-dialog h2 { margin:6px 0 10px; }
+.value-picker-dialog h3 { margin:20px 0 9px; color:#425349; font-size:14px; }
+.value-picker-hint { margin:0; color:#59675e; font-size:14px; line-height:1.5; }
+.value-picker-controls { display:flex; align-items:stretch; gap:6px; min-width:0; }
+.value-picker-options, .value-picker-recent-list { display:flex; gap:8px; min-width:0; overflow-x:auto; overscroll-behavior-inline:contain; scroll-snap-type:x proximity; scrollbar-width:thin; padding:5px 2px 9px; }
+.value-picker-options { position:relative; flex:1 1 0; }
+.value-picker-choice { flex:0 0 auto; min-width:62px; min-height:48px; padding:8px 12px; scroll-snap-align:center; border:1px solid #dce7d8; border-radius:10px; color:#304439; background:#fff; font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+.value-picker-choice:hover, .value-picker-choice[aria-pressed="true"] { border-color:#8bbf67; background:#eaf7e2; }
+.value-picker-arrow { display:grid; flex:0 0 44px; min-height:48px; place-items:center; border:1px solid #dce7d8; border-radius:10px; color:#496544; background:#f8fbf6; font-size:24px; }
+.value-picker-recent-list { max-width:100%; }
+@media(max-width:620px) {
+  .set-field > label { display:block; font-size:12px; }
+  .set-row { grid-template-columns:24px minmax(0, 1fr) minmax(0, 1fr) 16px; gap:4px; padding:8px 4px; }
+  .set-value-control { gap:2px; }
+  .value-picker-trigger { flex-basis:40px; min-width:40px; }
+  .value-picker-dialog { max-height:calc(100dvh - 24px); }
+}

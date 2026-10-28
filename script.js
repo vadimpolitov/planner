@@ -981,13 +981,54 @@ function renderExercise(exercise, index, entry) {
   const firstOpenSet = sets.findIndex((set) => String(set.reps).trim() === "");
   const setRows = sets.map((set, setIndex) => {
     const logged = String(set.reps).trim() !== "";
-    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><label class="visually-hidden" for="weight-${index}-${setIndex}">Вес, килограммы, подход ${setIndex + 1}</label><label class="set-field"><span>Вес, кг</span><input id="weight-${index}-${setIndex}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /></label><label class="visually-hidden" for="reps-${index}-${setIndex}">Повторения, подход ${setIndex + 1}</label><label class="set-field"><span>Повторы</span><input id="reps-${index}-${setIndex}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /></label><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
+    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><div class="set-field"><label for="weight-${index}-${setIndex}">Вес, кг</label><div class="set-value-control"><input id="weight-${index}-${setIndex}" aria-label="Вес, килограммы, подход ${setIndex + 1}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="weight" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать вес, подход ${setIndex + 1}" title="Выбрать вес">⌄</button></div></div><div class="set-field"><label for="reps-${index}-${setIndex}">Повторы</label><div class="set-value-control"><input id="reps-${index}-${setIndex}" aria-label="Повторения, подход ${setIndex + 1}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="reps" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать повторы, подход ${setIndex + 1}" title="Выбрать повторы">⌄</button></div></div><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
   }).join("");
   return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
 }
 
+function openValuePicker(trigger) {
+  const field = trigger.dataset.valuePicker;
+  const exerciseIndex = Number(trigger.dataset.exercise);
+  const setIndex = Number(trigger.dataset.set);
+  const draft = data.currentSession;
+  const entry = draft?.entries[exerciseIndex];
+  const exercise = (draft?.planSnapshot || workoutPlans[draft?.workout])?.exercises[exerciseIndex];
+  const input = document.querySelector(`#${field}-${exerciseIndex}-${setIndex}`);
+  if (!entry || !exercise || !input) return;
+  const exerciseName = (exercise.options || [exercise.name])[entry.optionIndex] || exercise.name;
+  const previous = [...data.sessions].reverse().flatMap((session) => [...session.entries].reverse()
+    .filter((item) => item.name === exerciseName).flatMap((item) => [...item.sets].reverse()));
+  const recent = [...entry.sets].reverse().concat(previous).map((set) => String(set[field] ?? "").trim())
+    .filter((value) => value !== "" && Number.isFinite(Number(value)) && Number(value) >= 0 && (field !== "reps" || Number(value) <= 100));
+  const uniqueRecent = [...new Set(recent.map(Number))].slice(0, 8);
+  const current = input.value.trim() === "" ? null : Number(input.value);
+  const standard = field === "weight" ? [...Array.from({ length: 81 }, (_, i) => i * 2.5)] : Array.from({ length: 31 }, (_, i) => i);
+  const values = [...new Set([...standard, ...uniqueRecent, ...(Number.isFinite(current) && current !== null ? [current] : [])])].sort((a, b) => a - b);
+  const unit = field === "weight" ? "кг" : "повторов";
+  const format = (number) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(number);
+  const buttonFor = (value) => `<button type="button" class="value-picker-choice" data-picker-value="${escapeHtml(value)}" aria-label="${escapeHtml(format(value))} ${unit}" aria-pressed="${current === value}">${escapeHtml(format(value))}</button>`;
+  document.querySelector("#value-picker-title").textContent = `${field === "weight" ? "Вес, кг" : "Повторения"} · подход ${setIndex + 1}`;
+  const recentBlock = document.querySelector("#value-picker-recent");
+  recentBlock.hidden = uniqueRecent.length === 0;
+  document.querySelector("#value-picker-recent-list").innerHTML = uniqueRecent.map(buttonFor).join("");
+  const options = document.querySelector("#value-picker-options");
+  options.innerHTML = values.map(buttonFor).join("");
+  document.querySelectorAll("#value-picker-dialog [data-picker-value]").forEach((button) => button.addEventListener("click", () => {
+    input.value = button.dataset.pickerValue;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    closeDialog(document.querySelector("#value-picker-dialog"));
+  }));
+  showDialog("value-picker-dialog");
+  requestAnimationFrame(() => {
+    const targetValue = current ?? uniqueRecent[0] ?? (field === "reps" ? exercise.min : 0);
+    const target = [...options.querySelectorAll("[data-picker-value]")].find((button) => Number(button.dataset.pickerValue) >= targetValue) || options.lastElementChild;
+    if (target) options.scrollLeft = Math.max(0, target.offsetLeft - options.clientWidth / 2 + target.offsetWidth / 2);
+  });
+}
+
 function bindSessionEvents() {
   bindHelpLinks();
+  document.querySelectorAll("[data-value-picker]").forEach((button) => button.addEventListener("click", () => openValuePicker(button)));
   const timerPreset = document.querySelector("#timer-preset");
   timerPreset.value = timerPresetSeconds;
   timerPreset.addEventListener("change", () => { timerPresetManuallyChanged = true; timerPresetSeconds = timerPreset.value; });
@@ -1473,6 +1514,8 @@ function bindEvents() {
   });
   document.querySelectorAll("[data-close-dialog]").forEach((b) => b.addEventListener("click", () => closeDialog(document.querySelector(`#${b.dataset.closeDialog}`))));
   bindDialogKeyboardControls();
+  document.querySelector("#value-picker-prev").addEventListener("click", () => document.querySelector("#value-picker-options").scrollBy({ left: -220, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }));
+  document.querySelector("#value-picker-next").addEventListener("click", () => document.querySelector("#value-picker-options").scrollBy({ left: 220, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" }));
   document.querySelector("#add-exercise").addEventListener("click", () => {
     const rows = editorRowValues();
     rows.push({ exerciseId: "", sets: 3, min: 8, max: 12, rest: "short", _open: true });

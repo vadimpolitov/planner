@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
-    <link rel="stylesheet" href="style.css?v=2.3" />
+    <link rel="stylesheet" href="style.css?v=2.4" />
   </head>
   <body>
     <div class="app-shell">
@@ -166,6 +166,16 @@
         <div class="technique-block"><h3>Выполнение по шагам</h3><ol id="exercise-steps"></ol></div><section class="exercise-cue-block"><h3>Важные ориентиры</h3><p id="exercise-cue" class="exercise-cue"></p></section>
       </section>
     </div>
+    <div class="dialog-backdrop" id="value-picker-dialog" hidden>
+      <section class="app-dialog value-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="value-picker-title">
+        <button class="dialog-close" type="button" data-close-dialog="value-picker-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">ВЫБОР ЗНАЧЕНИЯ</p><h2 id="value-picker-title"></h2>
+        <p class="value-picker-hint">Пролистай значения и нажми нужное. Число также можно ввести в поле вручную.</p>
+        <div id="value-picker-recent" class="value-picker-recent" hidden><h3>Недавние значения</h3><div id="value-picker-recent-list" class="value-picker-recent-list"></div></div>
+        <h3>Все значения</h3><div class="value-picker-controls"><button class="value-picker-arrow" type="button" id="value-picker-prev" aria-label="Предыдущие значения">‹</button><div id="value-picker-options" class="value-picker-options" aria-label="Значения" tabindex="0"></div><button class="value-picker-arrow" type="button" id="value-picker-next" aria-label="Следующие значения">›</button></div>
+        <div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="value-picker-dialog">Отмена</button></div>
+      </section>
+    </div>
     <div class="dialog-backdrop" id="finish-dialog" hidden>
       <section class="app-dialog finish-dialog" role="dialog" aria-modal="true" aria-labelledby="finish-dialog-title">
         <p class="eyebrow">ЗАВЕРШЕНИЕ ТРЕНИРОВКИ</p><h2 id="finish-dialog-title">Сохранить неполное занятие?</h2><p id="finish-summary" class="dialog-description"></p>
@@ -173,6 +183,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=2.3"></script>
+    <script src="script.js?v=2.4"></script>
   </body>
 </html>
