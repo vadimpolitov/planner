@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
     <script>try { document.documentElement.dataset.theme = localStorage.getItem("ritm-theme") === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }</script>
-    <link rel="stylesheet" href="style.css?v=3.4" />
+    <link rel="stylesheet" href="style.css?v=3.5" />
   </head>
   <body>
     <div class="app-shell">
@@ -49,8 +49,8 @@
           <section class="panel workout-panel" id="workout-panel"></section>
           <section class="panel program-progress" id="program-progress" aria-label="Прогресс программы"></section>
           <section class="panel rhythm-panel" id="rhythm-progress" aria-label="Прогресс за неделю"></section>
-          <section class="panel achievements-panel" id="achievements" aria-label="Достижения"></section>
-          <section class="panel monthly-panel" id="monthly-overview" aria-label="Итоги месяца"></section>
+          <details class="overview-extra"><summary>Достижения</summary><section class="panel achievements-panel" id="achievements" aria-label="Достижения"></section></details>
+          <details class="overview-extra"><summary>Итоги месяца</summary><section class="panel monthly-panel" id="monthly-overview" aria-label="Итоги месяца"></section></details>
         </section>
 
         <section class="view" id="view-plan" aria-labelledby="plan-title">
@@ -196,6 +196,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=3.4"></script>
+    <script src="script.js?v=3.5"></script>
   </body>
 </html>

@@ -851,6 +851,17 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 :root[data-theme="dark"] .toast { color:#e2f2df; background:#263a2b; border-color:#4a704c; }
 :root[data-theme="dark"] :where(button,a[href],input,select,textarea):focus-visible { outline-color:#b2ed76; }
 @media(max-width:400px) { .topbar-actions { flex-wrap:wrap; } }
+
+/* Clearer compact workout and optional overview sections. */
+.warmup-card { display:block; padding:10px 14px; }
+.warmup-card summary { cursor:pointer; color:var(--ink); font-size:13px; font-weight:700; }
+.warmup-card p { margin:8px 0 0; }
+.overview-extra { margin-top:12px; }
+.overview-extra > summary { cursor:pointer; padding:14px 18px; border:1px solid var(--line); border-radius:12px; color:var(--ink); background:var(--panel); font-weight:700; }
+.overview-extra > section { margin-top:8px; }
+.history-tabs[hidden] { display:none; }
+[data-set-field][aria-invalid="true"] { border-color:#bf4c3e; outline:2px solid #bf4c3e; }
+@media(max-width:620px) { .profile-switcher select { width:145px; } }
 :root[data-theme="dark"] .profile-switcher select { color:#e4f0e5; }
 :root[data-theme="dark"] .body-stat-card > strong small { color:#b5c4b8; }
 :root[data-theme="dark"] .plan-editor-row > summary::after { color:#b5c4b8; }

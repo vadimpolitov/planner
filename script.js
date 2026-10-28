@@ -560,7 +560,7 @@ function renderProgramProgress() {
   const week = Math.min(Math.floor(progress / 3) + 1, 6);
   const sessionsThisWeek = progress >= 18 ? 3 : progress % 3;
   const isComplete = progress >= 18;
-  const label = isComplete ? "Шестинедельный цикл завершён" : `Неделя ${week} из 6 · ${sessionsThisWeek} из 3 тренировок`;
+  const label = isComplete ? "Шестинедельный цикл завершён" : `Этап цикла ${week} из 6 · ${sessionsThisWeek} из 3 тренировок`;
   document.querySelector("#program-progress").innerHTML = `<div class="program-progress-heading"><div><p class="eyebrow">ТВОЯ ПРОГРАММА</p><strong>${label}</strong></div><span>${progress}/18</span></div><div class="program-progress-track" role="progressbar" aria-label="Прогресс шестинедельной программы" aria-valuemin="0" aria-valuemax="18" aria-valuenow="${progress}"><span style="width:${Math.round(progress / 18 * 100)}%"></span></div><div class="program-progress-footer"><p>${isComplete ? "Все 18 тренировок отмечены. История сохранена — можно начать новый цикл." : `Старт цикла: ${formatDate(data.programCycle.startDate, { day: "numeric", month: "long", year: "numeric" })}`}</p><button type="button" class="secondary-button" id="edit-program">Изменить</button></div>`;
   document.querySelector("#edit-program").addEventListener("click", openProgramEditor);
 }
@@ -723,7 +723,7 @@ function renderMotivation() {
   const { done, partial } = weekStats();
   const goal = weeklyGoal();
   const rhythm = document.querySelector("#rhythm-progress");
-  rhythm.innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ТВОЙ РИТМ</p><h2>На этой неделе</h2></div><label class="weekly-goal-label">Цель <select id="weekly-goal" aria-label="Цель тренировок на неделю">${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}" ${goal === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label></div><p class="weekly-summary"><strong>${done} из ${goal}</strong> завершённых тренировок${partial ? ` · частично: ${partial}` : ""}</p><div class="weekly-dots" role="img" aria-label="${done} из ${goal} завершённых тренировок">${Array.from({ length: goal }, (_, i) => `<span class="${i < done ? "is-done" : ""}"></span>`).join("")}</div><p class="motivation-note">${done >= goal ? "Цель на неделю достигнута. Отдых тоже часть плана." : "Каждая записанная тренировка имеет значение. Отдых тоже часть плана."}</p>`;
+  rhythm.innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ТВОЙ РИТМ</p><h2>На этой неделе</h2></div><label class="weekly-goal-label">Цель <select id="weekly-goal" aria-label="Цель тренировок на неделю">${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}" ${goal === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label></div><p class="weekly-summary"><strong>${done} из ${goal}</strong> завершённых тренировок${partial ? ` · частично: ${partial}` : ""}</p><div class="weekly-dots" role="img" aria-label="${done} из ${goal} завершённых тренировок">${Array.from({ length: goal }, (_, i) => `<span class="${i < done ? "is-done" : ""}"></span>`).join("")}</div><p class="motivation-note">${done >= goal ? "Цель на неделю достигнута. Отдых тоже часть плана." : "Каждая записанная тренировка имеет значение. Отдых тоже часть плана."} Цель недели не меняет план цикла А/Б.</p>`;
   rhythm.querySelector("#weekly-goal").addEventListener("change", (event) => {
     const previous = data.weeklyGoal;
     data.weeklyGoal = Number(event.target.value);
@@ -951,8 +951,15 @@ function renderCalendar() {
 
 function renderSelectedDay() {
   const plans = data.scheduled.filter((item) => item.date === selectedCalendarDate);
+  const sessions = data.sessions.filter((item) => item.date === selectedCalendarDate);
   const canSchedule = selectedCalendarDate >= localDateKey();
-  document.querySelector("#selected-day-panel").innerHTML = `<p class="eyebrow">ВЫБРАННЫЙ ДЕНЬ</p><h2>${formatDate(selectedCalendarDate, { weekday: "long", day: "numeric", month: "long" })}</h2>${plans.length ? plans.map((item) => `<article class="scheduled-card"><span class="workout-badge">${item.workout}</span><strong>Тренировка ${item.workout}</strong><div>${canSchedule ? `<button class="primary-button" type="button" data-start-scheduled="${escapeHtml(item.id)}">Начать</button>` : ""}<button class="secondary-button" type="button" data-edit-scheduled="${escapeHtml(item.id)}">${canSchedule ? "Изменить" : "Перенести"}</button><button class="danger-button" type="button" data-cancel-scheduled="${escapeHtml(item.id)}">Отменить</button></div></article>`).join("") : `<p class="dialog-description">${canSchedule ? "На этот день пока нет тренировок." : "Этот день уже прошёл. Новые тренировки можно планировать только на сегодня или позже."}</p>`}${canSchedule ? `<button class="primary-button" id="schedule-selected" type="button">＋ Запланировать на этот день</button>` : ""}`;
+  document.querySelector("#selected-day-panel").innerHTML = `<p class="eyebrow">ВЫБРАННЫЙ ДЕНЬ</p><h2>${formatDate(selectedCalendarDate, { weekday: "long", day: "numeric", month: "long" })}</h2>${plans.map((item) => `<article class="scheduled-card"><span class="workout-badge">${item.workout}</span><strong>Тренировка ${item.workout} · запланирована</strong><div>${canSchedule ? `<button class="primary-button" type="button" data-start-scheduled="${escapeHtml(item.id)}">Начать</button>` : ""}<button class="secondary-button" type="button" data-edit-scheduled="${escapeHtml(item.id)}">${canSchedule ? "Изменить" : "Перенести"}</button><button class="danger-button" type="button" data-cancel-scheduled="${escapeHtml(item.id)}">Отменить</button></div></article>`).join("")}${sessions.map((item) => `<article class="scheduled-card"><span class="workout-badge">${escapeHtml(item.workout)}</span><strong>Тренировка ${escapeHtml(item.workout)} · ${item.status === "partial" ? "неполная" : "выполнена"}</strong><div><button class="secondary-button" type="button" data-calendar-history>Посмотреть историю</button></div></article>`).join("")}${!plans.length && !sessions.length ? `<p class="dialog-description">${canSchedule ? "На этот день пока нет тренировок." : "Этот день уже прошёл. Новые тренировки можно планировать только на сегодня или позже."}</p>` : ""}${canSchedule ? `<button class="primary-button" id="schedule-selected" type="button">＋ Запланировать на этот день</button>` : ""}`;
+  document.querySelectorAll("[data-calendar-history]").forEach((button) => button.addEventListener("click", () => {
+    selectedHistory = "workouts";
+    document.querySelectorAll(".history-tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.history === "workouts"));
+    showView("history");
+    window.scrollTo(0, 0);
+  }));
   document.querySelector("#schedule-selected")?.addEventListener("click", () => openSchedule(selectedCalendarDate));
   document.querySelectorAll("[data-start-scheduled]").forEach((b) => b.addEventListener("click", () => startWorkout(b.dataset.startScheduled)));
   document.querySelectorAll("[data-edit-scheduled]").forEach((b) => b.addEventListener("click", () => openSchedule(null, b.dataset.editScheduled)));
@@ -1080,7 +1087,8 @@ function startWorkout(scheduleId = "") {
       id: `session-${Date.now()}`,
       workout,
       planSnapshot: plan,
-      date: scheduled?.date || localDateKey(),
+      date: localDateKey(),
+      scheduledDate: scheduled?.date || "",
       scheduleId: scheduled?.id || "",
       startedAt: new Date().toISOString(),
       effort: "",
@@ -1118,7 +1126,7 @@ function renderSession() {
   if (!draft) return showView("overview");
   const plan = draft.planSnapshot || workoutPlans[draft.workout];
   document.querySelector("#session-date").textContent = formatDate(draft.date, { day: "numeric", month: "long", year: "numeric" });
-  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><div class="warmup-card"><span>↗</span><p><strong>Разминка</strong> · 5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></div><div class="session-tools"><span>5 сигналов и гонг${window.RitmTimer ? "" : " · фоновый звук зависит от браузера"}.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
+  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><details class="warmup-card"><summary>Разминка</summary><p>5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></details><div class="session-tools"><span>5 сигналов и гонг${window.RitmTimer ? "" : " · фоновый звук зависит от браузера"}.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
   bindSessionEvents();
   if (restTimer.interval || restTimer.finished) updateRestTimer();
 }
@@ -1133,7 +1141,7 @@ function renderExercise(exercise, index, entry) {
   const firstOpenSet = sets.findIndex((set) => String(set.reps).trim() === "");
   const setRows = sets.map((set, setIndex) => {
     const logged = String(set.reps).trim() !== "";
-    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><div class="set-field"><label for="weight-${index}-${setIndex}">Вес, кг</label><div class="set-value-control"><input id="weight-${index}-${setIndex}" aria-label="Вес, килограммы, подход ${setIndex + 1}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="weight" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать вес, подход ${setIndex + 1}" title="Выбрать вес">⌄</button></div></div><div class="set-field"><label for="reps-${index}-${setIndex}">Повторы</label><div class="set-value-control"><input id="reps-${index}-${setIndex}" aria-label="Повторения, подход ${setIndex + 1}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="reps" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать повторы, подход ${setIndex + 1}" title="Выбрать повторы">⌄</button></div></div><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
+    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><div class="set-field"><label for="weight-${index}-${setIndex}">Вес, кг</label><div class="set-value-control"><input id="weight-${index}-${setIndex}" aria-label="Вес, килограммы, подход ${setIndex + 1}" type="number" inputmode="decimal" min="0" step="any" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="weight" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать вес, подход ${setIndex + 1}" title="Выбрать вес">⌄</button></div></div><div class="set-field"><label for="reps-${index}-${setIndex}">Повторы</label><div class="set-value-control"><input id="reps-${index}-${setIndex}" aria-label="Повторения, подход ${setIndex + 1}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="reps" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать повторы, подход ${setIndex + 1}" title="Выбрать повторы">⌄</button></div></div><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
   }).join("");
   const difference = compareExerciseSets(entry, lastExerciseEntry(name));
   const comparison = difference === null ? "" : difference > 0 ? `↑ На ${difference} повторов больше при тех же весах` : difference === 0 ? "Результат совпадает с прошлым при тех же весах" : `На ${Math.abs(difference)} повторов меньше при тех же весах`;
@@ -1190,6 +1198,11 @@ function bindSessionEvents() {
     const exerciseIndex = Number(input.dataset.exercise);
     const setIndex = Number(input.dataset.set);
     const field = input.dataset.setField;
+    input.setAttribute("aria-invalid", String(!input.validity.valid));
+    if (!input.validity.valid) {
+      showToast(field === "weight" ? "Укажи вес не меньше нуля." : "Укажи целое число повторов от 0 до 100.");
+      return;
+    }
     data.currentSession.entries[exerciseIndex].sets[setIndex][field] = input.value;
     saveData();
     const card = input.closest(".exercise-card");
@@ -1458,6 +1471,13 @@ function cancelCurrentWorkout() {
 }
 function requestFinishWorkout() {
   const draft = data.currentSession;
+  const invalidInput = [...document.querySelectorAll("[data-set-field]")].find((input) => !input.validity.valid);
+  if (invalidInput) {
+    invalidInput.setAttribute("aria-invalid", "true");
+    invalidInput.focus();
+    showToast(invalidInput.dataset.setField === "weight" ? "Укажи вес не меньше нуля." : "Укажи целое число повторов от 0 до 100.");
+    return;
+  }
   const total = draft.entries.length;
   const completed = draft.entries.filter((entry) => entry.completed).length;
   if (!total) {
@@ -1469,6 +1489,8 @@ function requestFinishWorkout() {
     showDialog("finish-dialog");
     return;
   }
+  if (!draft.entries.some((entry) => entry.sets.some((set) => String(set.reps ?? "").trim() !== ""))
+      && !window.confirm("Подходы не записаны. Сохранить тренировку без результатов подходов?")) return;
   finishWorkout(false);
 }
 
@@ -1519,7 +1541,7 @@ function openSessionEditor(id) {
   document.querySelector("#session-editor-entries").innerHTML = session.entries.map((entry, entryIndex) => `
     <article class="session-edit-exercise">
       <div class="session-edit-heading"><h3>${escapeHtml(entry.name)}</h3><label><input type="checkbox" data-session-completed="${entryIndex}" ${entry.completed ? "checked" : ""} /> Выполнено</label></div>
-      ${entry.sets.map((set, setIndex) => `<div class="session-edit-set"><span>Подход ${setIndex + 1}</span><label>Вес, кг<input type="number" min="0" step="0.5" value="${escapeHtml(set.weight || "")}" data-session-weight="${entryIndex}-${setIndex}" /></label><label>Повторы<input type="number" min="0" max="100" step="1" value="${escapeHtml(set.reps || "")}" data-session-reps="${entryIndex}-${setIndex}" /></label></div>`).join("")}
+      ${entry.sets.map((set, setIndex) => `<div class="session-edit-set"><span>Подход ${setIndex + 1}</span><label>Вес, кг<input type="number" min="0" step="any" value="${escapeHtml(set.weight || "")}" data-session-weight="${entryIndex}-${setIndex}" /></label><label>Повторы<input type="number" min="0" max="100" step="1" value="${escapeHtml(set.reps || "")}" data-session-reps="${entryIndex}-${setIndex}" /></label></div>`).join("")}
     </article>`).join("");
   showDialog("session-editor-dialog");
 }
@@ -1531,6 +1553,10 @@ function deleteSessionFromHistory(id) {
   const date = formatDate(session.date, { day: "numeric", month: "long", year: "numeric" });
   if (!window.confirm(`Удалить тренировку от ${date} из истории? Это действие нельзя отменить.`)) return;
   const previousCycle = structuredClone(data.programCycle);
+  const completedBefore = completedTrainingCount(data.sessions.slice(0, index));
+  if (session.status !== "partial" && completedBefore < data.programCycle.completedAtStart) {
+    data.programCycle.completedAtStart -= 1;
+  }
   data.sessions.splice(index, 1);
   data.programCycle = normalizeProgramCycle(data.programCycle, data.sessions);
   if (!saveData()) {
@@ -1555,9 +1581,13 @@ function formatWorkoutReport(session) {
     `План: ${workoutName}`,
     `Статус: ${status}`,
     `Общая тяжесть: ${session.effort ? `${session.effort}/10` : "не оценена"}`,
-    "",
-    "Упражнения и рабочие подходы:",
   ];
+  const measurements = Object.entries(data.daily).filter(([date]) => date <= session.date).sort(([a], [b]) => b.localeCompare(a));
+  for (const [field, label, unit] of [["weight", "Вес", "кг"], ["waist", "Талия", "см"]]) {
+    const item = measurements.find(([, value]) => Number(value?.[field]) > 0);
+    lines.push(item ? `${label}: ${item[1][field]} ${unit} (замер ${formatDate(item[0], { day: "numeric", month: "long", year: "numeric" })})` : `${label}: нет замера на дату тренировки или ранее`);
+  }
+  lines.push("", "Упражнения и рабочие подходы:");
   session.entries.forEach((entry, index) => {
     lines.push(`${index + 1}. ${entry.name}${entry.completed ? " — выполнено" : " — не отмечено как выполненное"}`);
     const recordedSets = (entry.sets || []).filter((set) => String(set.weight || "").trim() || String(set.reps || "").trim());
@@ -1615,6 +1645,9 @@ function saveSessionEdit(event) {
     error.textContent = "Укажи тяжесть от 1 до 10 или оставь поле пустым."; error.hidden = false; return;
   }
   const previous = structuredClone(session);
+  const previousCycle = structuredClone(data.programCycle);
+  const sessionIndex = data.sessions.indexOf(session);
+  const inPreviousCycle = completedTrainingCount(data.sessions.slice(0, sessionIndex)) < data.programCycle.completedAtStart;
   session.date = String(values.get("date"));
   session.effort = effort;
   session.entries.forEach((entry, entryIndex) => {
@@ -1627,8 +1660,11 @@ function saveSessionEdit(event) {
   session.completedExercises = session.entries.filter((entry) => entry.completed).length;
   session.totalExercises = session.entries.length;
   session.status = session.completedExercises === session.totalExercises ? "completed" : "partial";
+  if (inPreviousCycle && previous.status !== "partial" && session.status === "partial") data.programCycle.completedAtStart -= 1;
+  if (inPreviousCycle && previous.status === "partial" && session.status !== "partial") data.programCycle.completedAtStart += 1;
   if (!saveData()) {
     Object.assign(session, previous);
+    data.programCycle = previousCycle;
     return;
   }
   editingSessionId = null;
@@ -1641,6 +1677,9 @@ function saveSessionEdit(event) {
 
 function renderHistory() {
   const content = document.querySelector("#history-content");
+  const hasDailyHistory = Object.values(data.daily).some((entry) => entry && (entry.cardioMinutes || entry.note));
+  document.querySelector(".history-tabs").hidden = !hasDailyHistory;
+  if (!hasDailyHistory) selectedHistory = "workouts";
   if (selectedHistory === "workouts") {
     if (!data.sessions.length) {
       content.innerHTML = `<div class="empty-state"><span>◷</span><h2>Пока нет завершённых тренировок</h2><p>После первой силовой здесь появится история подходов и рабочих весов.</p></div>`;
@@ -1973,7 +2012,7 @@ function importDataFile(event) {
 }
 
 function exportData() {
-  const backup = { format: "ritm-backup", version: 1, profileId: activeProfile.id, profileName: activeProfile.name, exportedAt: new Date().toISOString(), sessions: data.sessions, currentSession: data.currentSession, daily: data.daily, scheduled: data.scheduled, plans: data.plans, exerciseLibrary: data.exerciseLibrary, programCycle: data.programCycle };
+  const backup = { format: "ritm-backup", version: 1, profileId: activeProfile.id, profileName: activeProfile.name, exportedAt: new Date().toISOString(), sessions: data.sessions, currentSession: data.currentSession, daily: data.daily, scheduled: data.scheduled, plans: data.plans, exerciseLibrary: data.exerciseLibrary, programCycle: data.programCycle, weeklyGoal: weeklyGoal() };
   const contents = JSON.stringify(backup, null, 2);
   if (window.AndroidBackup) {
   window.AndroidBackup.save(contents, `ritm-${activeProfile.id}-backup-${localDateKey()}.json`);
