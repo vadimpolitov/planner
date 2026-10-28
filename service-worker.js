@@ -1,4 +1,4 @@
-const CACHE_NAME = "ritm-app-shell-v18";
+const CACHE_NAME = "ritm-app-shell-v19";
 const CHARACTER_SCENES = ["achievement", "disappointed", "exercise-complete", "measurement", "personal-progress", "rest-complete", "rest", "support", "surprised", "thoughtful", "weekly-goal", "welcome", "workout-complete", "workout-start"];
 const APP_FILES = [
   "./",
