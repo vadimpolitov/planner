@@ -810,6 +810,23 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 :root[data-theme="dark"] .weekly-dots span.is-done { background:#a3d476; }
 @media (max-width:400px) { .rhythm-panel,.achievements-panel,.monthly-panel { padding:16px; } .achievement-grid { grid-template-columns:1fr; } .monthly-stats > div { padding:9px; } }
 @media (prefers-reduced-motion:no-preference) { .result-dialog { animation:result-appear .2s ease-out; } @keyframes result-appear { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } } }
+
+/* Consistent icons across the sidebar and the compact mobile navigation. */
+.navigation .nav-icon { display:block; flex:none; width:21px; height:21px; color:currentColor; }
+.navigation .nav-label { min-width:0; }
+@media (max-width:820px) {
+  .sidebar { height:calc(72px + env(safe-area-inset-bottom)); padding:5px 8px env(safe-area-inset-bottom); border-radius:18px 18px 0 0; box-shadow:0 -3px 18px #1d26220a; }
+  .navigation { gap:0; }
+  .navigation .nav-item { height:60px; min-height:48px; gap:4px; padding:4px 2px; border-radius:10px; color:#69746c; background:transparent; text-align:center; font-size:10px; font-weight:500; line-height:1.1; }
+  .navigation .nav-icon { width:23px; height:23px; }
+  .navigation .nav-label { max-width:100%; overflow-wrap:normal; }
+  .navigation .nav-item.active { color:#1d3025; background:transparent; font-weight:700; }
+  .navigation .nav-item.active .nav-icon { color:currentColor; stroke-width:2.6; }
+  .navigation .nav-item:focus-visible { outline:3px solid #78ad4f; outline-offset:-3px; }
+  :root[data-theme="dark"] .navigation .nav-item { color:#afc0b3; background:transparent; }
+  :root[data-theme="dark"] .navigation .nav-item.active { color:#dbf6c8; background:transparent; }
+  :root[data-theme="dark"] .navigation .nav-item.active .nav-icon { color:currentColor; }
+}
 :root[data-theme="dark"] .chart-grid-line { stroke:#435548; }
 :root[data-theme="dark"] :is(.chart-axis-label,.chart-date-label,.chart-value-label) { fill:#c2d1c5; }
 :root[data-theme="dark"] .chart-point { fill:#1c2921; }

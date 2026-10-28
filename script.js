@@ -1660,7 +1660,12 @@ function activityName(value) {
 
 function showView(view) {
   document.querySelectorAll(".view").forEach((element) => element.classList.toggle("active", element.id === `view-${view}`));
-  document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
   if (view === "history") renderHistory();
 }
 
