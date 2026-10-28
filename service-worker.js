@@ -1,8 +1,8 @@
-const CACHE_NAME = "ritm-app-shell-v14";
+const CACHE_NAME = "ritm-app-shell-v15";
 const APP_FILES = [
   "./",
   "./index.html",
-  "./style.css?v=3.1",
+  "./style.css?v=3.2",
   "./script.js?v=3.0",
   "./images/avatar-vadim-clear.png",
   "./images/avatar-dasha-clear.png",
