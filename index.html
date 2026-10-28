@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
     <script>try { document.documentElement.dataset.theme = localStorage.getItem("ritm-theme") === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }</script>
-    <link rel="stylesheet" href="style.css?v=2.9" />
+    <link rel="stylesheet" href="style.css?v=3.0" />
   </head>
   <body>
     <div class="app-shell">
@@ -43,6 +43,7 @@
         <section class="view active" id="view-overview" aria-labelledby="page-title">
           <div class="page-heading">
             <div><p class="eyebrow">ТВОЙ РИТМ</p><h1 id="page-title">Планируй. Тренируйся. Расти.</h1><p class="subheading">Стабильность важнее идеальной недели. Отмечай, что получилось.</p></div>
+            <div id="overview-character" class="character-slot"></div>
           </div>
           <div class="week-strip" id="week-strip" aria-label="Дни этой недели"></div>
           <section class="panel workout-panel" id="workout-panel"></section>
@@ -74,7 +75,7 @@
         </section>
 
         <section class="view" id="view-body" aria-labelledby="body-title">
-          <div class="page-heading"><div><p class="eyebrow">ТРЕНДЫ БЕЗ ШУМА</p><h1 id="body-title">Вес и параметры тела</h1><p class="subheading">Записывай утренний вес и талию. Смотри на тенденцию за недели, а не на отдельные колебания.</p></div></div>
+          <div class="page-heading"><div><p class="eyebrow">ТРЕНДЫ БЕЗ ШУМА</p><h1 id="body-title">Вес и параметры тела</h1><p class="subheading">Записывай утренний вес и талию. Смотри на тенденцию за недели, а не на отдельные колебания.</p></div><div id="body-character" class="character-slot"></div></div>
           <div class="body-stats" id="body-stats"></div>
           <div class="body-grid">
             <section class="panel body-entry-panel">
@@ -195,6 +196,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=2.9"></script>
+    <script src="script.js?v=3.0"></script>
   </body>
 </html>

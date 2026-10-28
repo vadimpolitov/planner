@@ -711,6 +711,14 @@ function achievementList() {
   ];
 }
 
+// The supplied sheets contain individual still poses, not animation frames.
+const characterScenes = { welcome: [0, 0], ready: [1, 0], exercise: [2, 0], rest: [3, 0], finished: [1, 1], progress: [2, 1], achievement: [3, 1], weekly: [0, 2], measurement: [1, 2], thoughtful: [3, 2], disappointed: [0, 3], support: [1, 3] };
+function characterMarkup(scene, size = "") {
+  const [column, row] = characterScenes[scene] || characterScenes.welcome;
+  const character = activeProfile.id === "wife" ? "dasha" : "vadim";
+  return `<span class="character character-${character} ${size}" style="--character-x:${column * 100 / 3}%;--character-y:${row * 32.46}%" aria-hidden="true"></span>`;
+}
+
 function renderMotivation() {
   const { done, partial } = weekStats();
   const goal = weeklyGoal();
@@ -724,7 +732,7 @@ function renderMotivation() {
   });
   const badges = achievementList();
   const earned = badges.filter((item) => item.value >= item.target).length;
-  document.querySelector("#achievements").innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ШАГ ЗА ШАГОМ</p><h2>Достижения</h2></div><span class="motivation-count">${earned}/${badges.length}</span></div><div class="achievement-grid">${badges.map((item) => `<article class="achievement ${item.value >= item.target ? "is-earned" : ""}"><span class="achievement-icon" aria-hidden="true">${item.icon}</span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><small>${item.value >= item.target ? "Получено ✓" : `${item.value} из ${item.target}`}</small></div></article>`).join("")}</div><p class="motivation-note">Достижения рассчитываются по истории и прогрессу текущего цикла.</p>`;
+  document.querySelector("#achievements").innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ШАГ ЗА ШАГОМ</p><h2>Достижения</h2></div><div class="character-heading">${characterMarkup("achievement", "character-small")}<span class="motivation-count">${earned}/${badges.length}</span></div></div><div class="achievement-grid">${badges.map((item) => `<article class="achievement ${item.value >= item.target ? "is-earned" : ""}"><span class="achievement-icon" aria-hidden="true">${item.icon}</span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><small>${item.value >= item.target ? "Получено ✓" : `${item.value} из ${item.target}`}</small></div></article>`).join("")}</div><p class="motivation-note">Достижения рассчитываются по истории и прогрессу текущего цикла.</p>`;
   const month = localDateKey().slice(0, 7);
   const sessions = orderedSessions().filter((session) => String(session.date).slice(0, 7) === month && session.date <= localDateKey());
   const doneMonth = completedTrainingCount(sessions);
@@ -775,6 +783,7 @@ function showWorkoutResult(session) {
   const week = weekStats();
   document.querySelector("#workout-result-title").textContent = session.status === "partial" ? "Тренировка сохранена частично" : "Тренировка завершена ✓";
   document.querySelector("#workout-result-content").innerHTML = `<p class="result-lead">${escapeHtml(workoutPlans[session.workout]?.name || "Тренировка")} · ${formatDate(session.date, { day: "numeric", month: "long" })}</p><div class="result-metrics"><div><strong>${completed}/${session.entries.length}</strong><span>упражнений отмечено</span></div><div><strong>${sets}</strong><span>подходов записано</span></div></div>${improvements.length ? `<div class="result-improvements"><strong>Прогресс относительно прошлого раза</strong>${improvements.map((item) => `<p>↗ ${escapeHtml(item.name)}: +${item.delta} повторов при тех же весах</p>`).join("")}</div>` : `<p class="motivation-note">Записывай подходы, чтобы сравнивать результаты с прошлой тренировкой.</p>`}<p class="motivation-note">На этой неделе: ${week.done} из ${weeklyGoal()} завершённых${week.partial ? ` · частично: ${week.partial}` : ""}.</p>`;
+  document.querySelector("#workout-result-content").insertAdjacentHTML("afterbegin", `<div class="result-character">${characterMarkup(session.status === "partial" ? "support" : improvements.length ? "progress" : "finished", "character-result")}</div>`);
   document.querySelector("#result-copy").onclick = () => copyWorkoutReport(session.id);
   document.querySelector("#result-history").onclick = () => { closeDialog(document.querySelector("#workout-result-dialog")); selectedHistory = "workouts"; showView("history"); window.scrollTo(0, 0); };
   showDialog("workout-result-dialog");
@@ -782,6 +791,7 @@ function showWorkoutResult(session) {
 
 function renderOverview() {
   renderHeader();
+  document.querySelector("#overview-character").innerHTML = characterMarkup("welcome", "character-hero");
   renderWeekStrip();
   renderProgramProgress();
   renderWorkoutCard();
@@ -854,6 +864,7 @@ function renderMetricChart(entries, field, containerId, unit, label, colorClass)
 }
 
 function renderBodyMetrics() {
+  document.querySelector("#body-character").innerHTML = characterMarkup("measurement", "character-hero");
   const entries = getBodyEntries();
   document.querySelector("#body-stats").hidden = !entries.length;
   document.querySelector("#body-empty").hidden = Boolean(entries.length);
@@ -1280,6 +1291,13 @@ function updateRestTimer() {
   const progress = document.querySelector("#timer-progress");
   const button = document.querySelector("#timer-button");
   const label = document.querySelector("#timer-label");
+  const header = display?.querySelector(".timer-display-header");
+  const scene = restTimer.finished ? "exercise" : "rest";
+  if (header && header.dataset.characterScene !== scene) {
+    header.querySelector(".timer-character")?.remove();
+    header.insertAdjacentHTML("afterbegin", `<span class="timer-character">${characterMarkup(scene, "character-timer")}</span>`);
+    header.dataset.characterScene = scene;
+  }
   if (display) { display.hidden = false; display.classList.toggle("timer-finished", restTimer.finished); }
   if (status) status.textContent = restTimer.finished ? "Отдых завершён" : "Отдых";
   if (time) time.textContent = `${minutes}:${seconds}`;

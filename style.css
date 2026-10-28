@@ -827,6 +827,21 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
   :root[data-theme="dark"] .navigation .nav-item.active { color:#dbf6c8; background:transparent; }
   :root[data-theme="dark"] .navigation .nav-item.active .nav-icon { color:currentColor; }
 }
+
+/* The supplied character sheets contain 14 individual still poses. */
+.character-slot { flex:0 0 auto; align-self:flex-end; margin-left:16px; }
+.character { display:block; width:82px; aspect-ratio:306 / 315; border-radius:12px; background-color:#12335e; background-repeat:no-repeat; background-size:400% 408%; background-position:var(--character-x) var(--character-y); image-rendering:pixelated; overflow:hidden; }
+.character-vadim { background-image:url("images/avatar-vadim.png"); }
+.character-dasha { background-image:url("images/avatar-dasha.png"); }
+.character-hero { width:100px; }
+.character-small { width:58px; border-radius:9px; }
+.character-result { width:100px; }
+.character-timer { width:42px; border-radius:7px; }
+.timer-display-header #timer-status { margin-right:auto; }
+.character-heading { display:flex; align-items:center; gap:12px; }
+.result-character { display:flex; justify-content:center; margin:12px 0; }
+@media (max-width:620px) { .character-slot { margin-left:8px; } .character-hero { width:72px; } .character-result { width:82px; } }
+@media (max-width:360px) { .character-hero { width:58px; } }
 :root[data-theme="dark"] .chart-grid-line { stroke:#435548; }
 :root[data-theme="dark"] :is(.chart-axis-label,.chart-date-label,.chart-value-label) { fill:#c2d1c5; }
 :root[data-theme="dark"] .chart-point { fill:#1c2921; }
