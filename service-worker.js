@@ -1,11 +1,13 @@
-const CACHE_NAME = "ritm-app-shell-v15";
+const CACHE_NAME = "ritm-app-shell-v16";
+const CHARACTER_SCENES = ["achievement", "disappointed", "exercise-complete", "measurement", "personal-progress", "rest-complete", "rest", "support", "surprised", "thoughtful", "weekly-goal", "welcome", "workout-complete", "workout-start"];
 const APP_FILES = [
   "./",
   "./index.html",
-  "./style.css?v=3.2",
-  "./script.js?v=3.0",
+  "./style.css?v=3.3",
+  "./script.js?v=3.3",
   "./images/avatar-vadim-clear.png",
   "./images/avatar-dasha-clear.png",
+  ...["vadim", "dasha"].flatMap((person) => CHARACTER_SCENES.map((scene) => `./images/characters/${person}/${person}-${scene}.gif`)),
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/ritm-192.png",
