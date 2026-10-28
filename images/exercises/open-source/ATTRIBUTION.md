@@ -21,4 +21,13 @@ Other exercise illustrations:
 - Pull-up — PTPioneer (Tyler Read), *Pull-ups exercise from back.jpg*, CC BY 2.0: https://commons.wikimedia.org/wiki/File:Pull-ups_exercise_from_back.jpg
 - Pallof press sequence — Bryl Lim, three exercise illustration frames combined into a wide sequence image, CC BY-SA 4.0: https://bryllim.github.io/workout-guide/exercises/pallof-press/
 
+Wife's plan illustrations:
+
+- Goblet squat — Bryl Lim / Workout Guide, frame 1, CC BY-SA 4.0: https://bryllim.github.io/workout-guide/exercises/goblet-squat/
+- Dumbbell bench press — Bryl Lim / Workout Guide, frame 1, CC BY-SA 4.0: https://bryllim.github.io/workout-guide/exercises/dumbbell-bench-press/
+- One-arm dumbbell row — Bryl Lim / Workout Guide, frame 1, CC BY-SA 4.0: https://bryllim.github.io/workout-guide/exercises/one-arm-dumbbell-row/
+- Dumbbell Romanian deadlift — Everkinetic, *Dumbbell dead lifts 2.svg*, CC BY-SA 3.0: https://commons.wikimedia.org/wiki/File:Dumbbell_dead_lifts_2.svg
+- Barbell hip thrust — Bryl Lim / Workout Guide, frame 2, CC BY-SA 4.0: https://bryllim.github.io/workout-guide/exercises/hip-thrust/
+- Incline dumbbell press — Bryl Lim / Workout Guide, frame 1, CC BY-SA 4.0: https://bryllim.github.io/workout-guide/exercises/incline-dumbbell-press/
+
 No exact-source image is shown for chest-supported row or single-leg cable leg curl; their current technique notes remain available without a misleading picture.
