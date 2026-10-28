@@ -1,9 +1,9 @@
-const CACHE_NAME = "ritm-app-shell-v9";
+const CACHE_NAME = "ritm-app-shell-v10";
 const APP_FILES = [
   "./",
   "./index.html",
   "./style.css?v=2.6",
-  "./script.js?v=2.6",
+  "./script.js?v=2.7",
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/ritm-192.png",

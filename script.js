@@ -74,7 +74,7 @@ const workoutPlanPresets = { vadim: defaultWorkoutPlans, wife: wifeWorkoutPlans 
 function getDefaultProfiles() {
   return [
     { id: "vadim", name: "План Вадима", presetId: "vadim", dataKey: storageKeyBase },
-    { id: "wife", name: "План жены", presetId: "wife", dataKey: `${storageKeyBase}::wife` },
+    { id: "wife", name: "План Даши", presetId: "wife", dataKey: `${storageKeyBase}::wife` },
   ];
 }
 
@@ -83,11 +83,17 @@ function loadProfileRegistry() {
   try {
     const saved = JSON.parse(localStorage.getItem(profileRegistryKey) || "null");
     if (saved && Array.isArray(saved.profiles)) {
+      let renamed = false;
       const profiles = defaults.map((profile) => {
         const stored = saved.profiles.find((item) => item?.id === profile.id);
-        return { ...profile, name: typeof stored?.name === "string" && stored.name.trim() ? stored.name.trim() : profile.name };
+        const savedName = typeof stored?.name === "string" ? stored.name.trim() : "";
+        const wasRenamed = profile.id === "wife" && savedName === "План жены";
+        if (wasRenamed) renamed = true;
+        return { ...profile, name: wasRenamed ? profile.name : (savedName || profile.name) };
       });
-      return { profiles, activeProfileId: profiles.some((profile) => profile.id === saved.activeProfileId) ? saved.activeProfileId : "vadim" };
+      const registry = { profiles, activeProfileId: profiles.some((profile) => profile.id === saved.activeProfileId) ? saved.activeProfileId : "vadim" };
+      if (renamed) { try { localStorage.setItem(profileRegistryKey, JSON.stringify(registry)); } catch {} }
+      return registry;
     }
   } catch {}
   const registry = { profiles: defaults, activeProfileId: "vadim" };
@@ -1526,7 +1532,7 @@ function renderProfileSelector() {
   select.innerHTML = profileRegistry.profiles.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name)}</option>`).join("");
   select.value = activeProfile.id;
   document.querySelector("#profile-name").textContent = activeProfile.name;
-  document.querySelector("#profile-avatar").textContent = activeProfile.id === "wife" ? "Ж" : "В";
+  document.querySelector("#profile-avatar").textContent = activeProfile.id === "wife" ? "Д" : "В";
 }
 
 function switchProfile(profileId) {
