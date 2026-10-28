@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
     <script>try { document.documentElement.dataset.theme = localStorage.getItem("ritm-theme") === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }</script>
-    <link rel="stylesheet" href="style.css?v=2.6" />
+    <link rel="stylesheet" href="style.css?v=2.8" />
   </head>
   <body>
     <div class="app-shell">
@@ -47,6 +47,9 @@
           <div class="week-strip" id="week-strip" aria-label="Дни этой недели"></div>
           <section class="panel workout-panel" id="workout-panel"></section>
           <section class="panel program-progress" id="program-progress" aria-label="Прогресс программы"></section>
+          <section class="panel rhythm-panel" id="rhythm-progress" aria-label="Прогресс за неделю"></section>
+          <section class="panel achievements-panel" id="achievements" aria-label="Достижения"></section>
+          <section class="panel monthly-panel" id="monthly-overview" aria-label="Итоги месяца"></section>
         </section>
 
         <section class="view" id="view-plan" aria-labelledby="plan-title">
@@ -114,6 +117,14 @@
         </section>
         <footer class="app-footer"><span>ритм<span class="brand-dot">.</span></span><span>Данные хранятся на этом устройстве</span><div class="backup-actions"><button type="button" id="export-button">Скачать резервную копию</button><button type="button" id="import-button">Восстановить из копии</button><input id="backup-import-input" type="file" accept=".json,application/json" hidden /></div><span id="import-status" class="import-status" role="status" aria-live="polite"></span><p id="ios-install-help" class="ios-install-help" hidden>На iPhone: в Safari нажми «Поделиться» → «На экран Домой».</p></footer>
       </main>
+    </div>
+    <div class="dialog-backdrop" id="workout-result-dialog" hidden>
+      <section class="app-dialog result-dialog" role="dialog" aria-modal="true" aria-labelledby="workout-result-title">
+        <button class="dialog-close" type="button" data-close-dialog="workout-result-dialog" aria-label="Закрыть">×</button>
+        <p class="eyebrow">ТВОЙ РЕЗУЛЬТАТ</p><h2 id="workout-result-title">Тренировка сохранена</h2>
+        <div id="workout-result-content"></div>
+        <div class="dialog-actions result-actions"><button class="secondary-button" type="button" id="result-copy">Скопировать отчёт</button><button class="primary-button" type="button" id="result-history">В историю</button></div>
+      </section>
     </div>
     <div class="dialog-backdrop" id="schedule-dialog" hidden>
       <section class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-dialog-title">
@@ -184,6 +195,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=2.7"></script>
+    <script src="script.js?v=2.8"></script>
   </body>
 </html>

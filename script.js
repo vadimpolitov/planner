@@ -437,6 +437,7 @@ function validateImportedBackup(raw) {
     planVersion: 2,
     currentSession: raw.currentSession || null,
     programCycle: raw.programCycle || null,
+    weeklyGoal: Number.isInteger(raw.weeklyGoal) && raw.weeklyGoal >= 1 && raw.weeklyGoal <= 7 ? raw.weeklyGoal : 3,
   };
   imported.currentSession = normalizeCurrentSession(imported.currentSession, plans);
   imported.programCycle = normalizeProgramCycle(imported.programCycle, imported.sessions);
@@ -642,11 +643,149 @@ function restartProgramCycle() {
   showToast("Новый шестинедельный цикл начат");
 }
 
+// Compare only complete, explicitly weighted sets of the same exercise.
+function compareExerciseSets(current, previous) {
+  const a = current?.sets, b = previous?.sets;
+  if (!Array.isArray(a) || !Array.isArray(b) || !a.length || a.length !== b.length) return null;
+  const valid = (set) => String(set?.weight ?? "").trim() !== "" && String(set?.reps ?? "").trim() !== ""
+    && Number.isFinite(Number(set.weight)) && Number(set.weight) >= 0
+    && Number.isInteger(Number(set.reps)) && Number(set.reps) >= 0;
+  if (!a.every(valid) || !b.every(valid) || !a.every((set, index) => Number(set.weight) === Number(b[index].weight))) return null;
+  return a.reduce((sum, set) => sum + Number(set.reps), 0) - b.reduce((sum, set) => sum + Number(set.reps), 0);
+}
+
+function orderedSessions() {
+  return [...data.sessions].sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.finishedAt || "").localeCompare(String(b.finishedAt || "")));
+}
+
+function previousEntry(name, session = null) {
+  const sessions = orderedSessions();
+  const end = session ? sessions.indexOf(session) : sessions.length;
+  for (let index = (end < 0 ? sessions.length : end) - 1; index >= 0; index--) {
+    const past = sessions[index];
+    const match = (past.entries || []).find((entry) => entry.name === name && (past.status !== "partial" || entry.completed));
+    if (match) return match;
+  }
+  return null;
+}
+
+function sessionImprovements(session) {
+  return (session.entries || []).filter((entry) => session.status !== "partial" || entry.completed)
+    .map((entry) => ({ name: entry.name, delta: compareExerciseSets(entry, previousEntry(entry.name, session)) }))
+    .filter((item) => item.delta !== null && item.delta > 0);
+}
+
+function weeklyGoal() {
+  const goal = Number(data.weeklyGoal);
+  return Number.isInteger(goal) && goal >= 1 && goal <= 7 ? goal : 3;
+}
+
+function weekStats() {
+  const keys = new Set(activeWeekKeys());
+  const sessions = data.sessions.filter((session) => keys.has(session.date));
+  return { done: completedTrainingCount(sessions), partial: sessions.filter((session) => session.status === "partial").length };
+}
+
+function achievementList() {
+  const completed = completedTrainingCount();
+  const seen = new Set();
+  let repeated = false;
+  for (const session of orderedSessions()) {
+    const thisSession = new Set();
+    for (const entry of session.entries || []) {
+      if (session.status === "partial" && !entry.completed) continue;
+      if (!(entry.sets || []).some((set) => String(set.reps ?? "").trim() !== "")) continue;
+      const name = exerciseNameKey(entry.name);
+      if (seen.has(name)) repeated = true;
+      thisSession.add(name);
+    }
+    thisSession.forEach((name) => seen.add(name));
+  }
+  const cycle = programCycleProgress();
+  return [
+    { icon: "🌱", title: "Первый шаг", detail: "Первая завершённая тренировка", value: Math.min(completed, 1), target: 1 },
+    { icon: "📝", title: "Есть с чем сравнить", detail: "Запиши результат упражнения в двух тренировках", value: repeated ? 1 : 0, target: 1 },
+    { icon: "💪", title: "В своём ритме", detail: "Три завершённые тренировки", value: Math.min(completed, 3), target: 3 },
+    { icon: "🎯", title: "Половина программы", detail: "Девять тренировок текущего цикла", value: Math.min(cycle, 9), target: 9 },
+    { icon: "🏁", title: "Цикл завершён", detail: "18 тренировок текущего цикла", value: Math.min(cycle, 18), target: 18 },
+  ];
+}
+
+function renderMotivation() {
+  const { done, partial } = weekStats();
+  const goal = weeklyGoal();
+  const rhythm = document.querySelector("#rhythm-progress");
+  rhythm.innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ТВОЙ РИТМ</p><h2>На этой неделе</h2></div><label class="weekly-goal-label">Цель <select id="weekly-goal" aria-label="Цель тренировок на неделю">${Array.from({ length: 7 }, (_, i) => `<option value="${i + 1}" ${goal === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label></div><p class="weekly-summary"><strong>${done} из ${goal}</strong> завершённых тренировок${partial ? ` · частично: ${partial}` : ""}</p><div class="weekly-dots" role="img" aria-label="${done} из ${goal} завершённых тренировок">${Array.from({ length: goal }, (_, i) => `<span class="${i < done ? "is-done" : ""}"></span>`).join("")}</div><p class="motivation-note">${done >= goal ? "Цель на неделю достигнута. Отдых тоже часть плана." : "Каждая записанная тренировка имеет значение. Отдых тоже часть плана."}</p>`;
+  rhythm.querySelector("#weekly-goal").addEventListener("change", (event) => {
+    const previous = data.weeklyGoal;
+    data.weeklyGoal = Number(event.target.value);
+    if (!saveData()) data.weeklyGoal = previous;
+    renderMotivation();
+  });
+  const badges = achievementList();
+  const earned = badges.filter((item) => item.value >= item.target).length;
+  document.querySelector("#achievements").innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ШАГ ЗА ШАГОМ</p><h2>Достижения</h2></div><span class="motivation-count">${earned}/${badges.length}</span></div><div class="achievement-grid">${badges.map((item) => `<article class="achievement ${item.value >= item.target ? "is-earned" : ""}"><span class="achievement-icon" aria-hidden="true">${item.icon}</span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><small>${item.value >= item.target ? "Получено ✓" : `${item.value} из ${item.target}`}</small></div></article>`).join("")}</div><p class="motivation-note">Достижения рассчитываются по истории и прогрессу текущего цикла.</p>`;
+  const month = localDateKey().slice(0, 7);
+  const sessions = orderedSessions().filter((session) => String(session.date).slice(0, 7) === month && session.date <= localDateKey());
+  const doneMonth = completedTrainingCount(sessions);
+  const partialMonth = sessions.filter((session) => session.status === "partial").length;
+  const names = new Set(sessions.flatMap((session) => (session.entries || []).filter((entry) => (session.status !== "partial" || entry.completed) && (entry.sets || []).some((set) => String(set.reps ?? "").trim() !== "")).map((entry) => exerciseNameKey(entry.name))));
+  const improved = new Set(sessions.flatMap((session) => sessionImprovements(session).map((item) => exerciseNameKey(item.name))));
+  const allCompleted = orderedSessions().filter((session) => session.status !== "partial");
+  const firstInMonth = (index) => allCompleted[index]?.date?.slice(0, 7) === month;
+  const newBadges = [];
+  if (firstInMonth(0)) newBadges.push("Первый шаг");
+  if (firstInMonth(2)) newBadges.push("В своём ритме");
+  const seenExercises = new Set();
+  let repetitionDate = null;
+  for (const session of orderedSessions()) {
+    const currentNames = new Set((session.entries || []).filter((entry) => (session.status !== "partial" || entry.completed)
+      && (entry.sets || []).some((set) => String(set.reps ?? "").trim() !== "")).map((entry) => exerciseNameKey(entry.name)));
+    if (!repetitionDate && [...currentNames].some((name) => seenExercises.has(name))) repetitionDate = session.date;
+    currentNames.forEach((name) => seenExercises.add(name));
+  }
+  if (repetitionDate?.slice(0, 7) === month) newBadges.push("Есть с чем сравнить");
+  for (const [target, title] of [[9, "Половина программы"], [18, "Цикл завершён"]]) {
+    const milestoneIndex = data.programCycle.completedAtStart + target - (data.programCycle.progressAdjustment || 0) - 1;
+    const reached = allCompleted[milestoneIndex];
+    if (milestoneIndex >= 0 && reached?.date >= data.programCycle.startDate && reached.date.slice(0, 7) === month && programCycleProgress() >= target) newBadges.push(title);
+  }
+  const monthName = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(new Date());
+  const monthly = document.querySelector("#monthly-overview");
+  monthly.innerHTML = `<div class="motivation-heading"><div><p class="eyebrow">ТВОИ ПОБЕДЫ</p><h2>Итоги месяца</h2></div><span class="motivation-count">${escapeHtml(monthName)}</span></div>${sessions.length ? `<div class="monthly-stats"><div><strong>${doneMonth}</strong><span>завершено</span></div><div><strong>${names.size}</strong><span>упражнений с записями</span></div><div><strong>${improved.size}</strong><span>улучшено по повторам</span></div></div>${newBadges.length ? `<p class="monthly-badges">Достижения по истории: ${newBadges.map(escapeHtml).join(", ")}</p>` : ""}<p class="motivation-note">${partialMonth ? `Частично выполненных тренировок: ${partialMonth}. ` : ""}Улучшения считаются только при одинаковых весах и числе записанных подходов.</p><button type="button" class="secondary-button monthly-copy">Скопировать итоги месяца</button>` : `<p class="motivation-note">Запиши тренировку, чтобы здесь появились итоги этого месяца.</p>`}`;
+  monthly.querySelector(".monthly-copy")?.addEventListener("click", async () => {
+    const report = [`Итоги тренировок за ${monthName}`, `Завершено тренировок: ${doneMonth}`, `Частично выполнено: ${partialMonth}`, `Упражнений с записями: ${names.size}`, `Упражнений с улучшением повторов при тех же весах: ${improved.size}`, ...(newBadges.length ? [`Достижения по истории: ${newBadges.join(", ")}`] : [])].join("\n");
+    try {
+      if (window.AndroidBackup?.copy) window.AndroidBackup.copy(report);
+      else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(report);
+      else {
+        const field = document.createElement("textarea"); field.value = report; field.setAttribute("readonly", "");
+        field.style.position = "fixed"; field.style.opacity = "0"; document.body.append(field); field.select();
+        const copied = document.execCommand("copy"); field.remove(); if (!copied) throw new Error("clipboard unavailable");
+      }
+      showToast("Итоги скопированы. Их можно вставить в диалог с ИИ-тренером.");
+    } catch { showToast("Не удалось скопировать итоги. Попробуй ещё раз в браузере."); }
+  });
+}
+
+function showWorkoutResult(session) {
+  const completed = (session.entries || []).filter((entry) => entry.completed).length;
+  const sets = (session.entries || []).reduce((sum, entry) => sum + (entry.sets || []).filter((set) => String(set.reps ?? "").trim() !== "").length, 0);
+  const improvements = sessionImprovements(session);
+  const week = weekStats();
+  document.querySelector("#workout-result-title").textContent = session.status === "partial" ? "Тренировка сохранена частично" : "Тренировка завершена ✓";
+  document.querySelector("#workout-result-content").innerHTML = `<p class="result-lead">${escapeHtml(workoutPlans[session.workout]?.name || "Тренировка")} · ${formatDate(session.date, { day: "numeric", month: "long" })}</p><div class="result-metrics"><div><strong>${completed}/${session.entries.length}</strong><span>упражнений отмечено</span></div><div><strong>${sets}</strong><span>подходов записано</span></div></div>${improvements.length ? `<div class="result-improvements"><strong>Прогресс относительно прошлого раза</strong>${improvements.map((item) => `<p>↗ ${escapeHtml(item.name)}: +${item.delta} повторов при тех же весах</p>`).join("")}</div>` : `<p class="motivation-note">Записывай подходы, чтобы сравнивать результаты с прошлой тренировкой.</p>`}<p class="motivation-note">На этой неделе: ${week.done} из ${weeklyGoal()} завершённых${week.partial ? ` · частично: ${week.partial}` : ""}.</p>`;
+  document.querySelector("#result-copy").onclick = () => copyWorkoutReport(session.id);
+  document.querySelector("#result-history").onclick = () => { closeDialog(document.querySelector("#workout-result-dialog")); selectedHistory = "workouts"; showView("history"); window.scrollTo(0, 0); };
+  showDialog("workout-result-dialog");
+}
+
 function renderOverview() {
   renderHeader();
   renderWeekStrip();
   renderProgramProgress();
   renderWorkoutCard();
+  renderMotivation();
 }
 
 function getBodyEntries() {
@@ -952,20 +1091,15 @@ function startWorkout(scheduleId = "") {
 }
 
 function lastExerciseEntry(exerciseName) {
-  for (const session of [...data.sessions].reverse()) {
-    const match = session.entries.find((entry) => entry.name === exerciseName && (session.status !== "partial" || entry.completed));
-    if (match) return match;
-  }
-  return null;
+  return previousEntry(exerciseName);
 }
 
 function progressionHint(exercise, name) {
   const last = lastExerciseEntry(name);
   if (!last || !last.sets?.length) return "Запиши первый результат — он станет точкой отсчёта.";
-  const reachedTop = last.sets.every((set) => Number(set.reps) >= exercise.max);
+  const reachedTop = last.sets.length === Number(exercise.sets) && last.sets.every((set) => String(set.reps ?? "").trim() !== "" && Number(set.reps) >= exercise.max);
   if (!reachedTop) return `В прошлый раз: ${last.sets.map((set) => `${set.weight || "—"} кг × ${set.reps || "—"}`).join(" · ")}. Сначала постарайся достичь верхней границы во всех подходах.`;
-  const step = exercise.kind === "lower" ? "+5 кг" : exercise.kind === "upper" ? "+2–2,5 кг" : "минимальный доступный шаг";
-  return `В прошлый раз верхняя граница выполнена во всех подходах. По плану можно рассмотреть прибавку: ${step}.`;
+  return "В прошлый раз верхняя граница выполнена во всех подходах. При хорошей технике можно рассмотреть небольшое увеличение веса.";
 }
 
 function renderSession() {
@@ -990,7 +1124,9 @@ function renderExercise(exercise, index, entry) {
     const logged = String(set.reps).trim() !== "";
     return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><div class="set-field"><label for="weight-${index}-${setIndex}">Вес, кг</label><div class="set-value-control"><input id="weight-${index}-${setIndex}" aria-label="Вес, килограммы, подход ${setIndex + 1}" type="number" inputmode="decimal" min="0" step="0.5" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="weight" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать вес, подход ${setIndex + 1}" title="Выбрать вес">⌄</button></div></div><div class="set-field"><label for="reps-${index}-${setIndex}">Повторы</label><div class="set-value-control"><input id="reps-${index}-${setIndex}" aria-label="Повторения, подход ${setIndex + 1}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="reps" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать повторы, подход ${setIndex + 1}" title="Выбрать повторы">⌄</button></div></div><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
   }).join("");
-  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
+  const difference = compareExerciseSets(entry, lastExerciseEntry(name));
+  const comparison = difference === null ? "" : difference > 0 ? `↑ На ${difference} повторов больше при тех же весах` : difference === 0 ? "Результат совпадает с прошлым при тех же весах" : `На ${Math.abs(difference)} повторов меньше при тех же весах`;
+  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><p class="exercise-comparison" aria-live="polite" ${comparison ? "" : "hidden"}>${escapeHtml(comparison)}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
 }
 
 function openValuePicker(trigger) {
@@ -1065,6 +1201,14 @@ function bindSessionEvents() {
     count.textContent = `${loggedSets} из ${totalSets} подходов записано`;
     bar.setAttribute("aria-valuenow", String(loggedSets));
     bar.firstElementChild.style.width = `${totalSets ? Math.round((loggedSets / totalSets) * 100) : 0}%`;
+    const plan = data.currentSession.planSnapshot || workoutPlans[data.currentSession.workout];
+    const exercise = plan.exercises[exerciseIndex];
+    const entry = data.currentSession.entries[exerciseIndex];
+    const name = (exercise.options || [exercise.name])[entry.optionIndex] || exercise.name;
+    const delta = compareExerciseSets(entry, lastExerciseEntry(name));
+    const comparison = card.querySelector(".exercise-comparison");
+    comparison.hidden = delta === null;
+    comparison.textContent = delta === null ? "" : delta > 0 ? `↑ На ${delta} повторов больше при тех же весах` : delta === 0 ? "Результат совпадает с прошлым при тех же весах" : `На ${Math.abs(delta)} повторов меньше при тех же весах`;
   }));
   document.querySelectorAll("[data-variant]").forEach((select) => select.addEventListener("change", () => {
     data.currentSession.entries[Number(select.dataset.variant)].optionIndex = Number(select.value);
@@ -1342,7 +1486,7 @@ function finishWorkout(partial = false) {
   closeDialog(document.querySelector("#finish-dialog"));
   showView("overview");
   renderOverview();
-  showToast(partial ? "Неполная тренировка сохранена" : "Тренировка сохранена в истории");
+  showWorkoutResult(record);
   window.scrollTo(0, 0);
 }
 
