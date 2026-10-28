@@ -196,30 +196,6 @@ let selectedCalendarDate = localDateKey();
 let selectedEditorWorkout = "A";
 let editingBodyDate = null;
 let editingSessionId = null;
-const exerciseImages = {
-  squat: ["championat/squat.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5167991-chto-takoe-olimpijskie-prisedaniya-prisedaniya-so-shtangoj-na-spine.html"],
-  bench: ["championat/bench.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4488421-kak-pravilno-delat-bazovye-uprazhneniya-bezopasnaya-tehnika-zhima-lezha-stanovoj-tyagi-prisedanij-so-shtangoj.html"],
-  row: ["championat/tyaga-shtangi.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5388400-tyaga-shtangi-v-naklone-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html"],
-  "romanian-deadlift": ["championat/romanian-deadlift.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5710238-rumynskaya-tyaga-so-shtangoj-tehnika-vypolneniya-kakie-myshcy-rabotayut-kak-pravilno-delat-uprazhnenie.html"],
-  "overhead-press": ["championat/overhead-press.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5809758-zhim-gantelej-sidya-tehnika-vypolneniya-kakie-myshcy-rabotayut.html"],
-  "triceps-pushdown": ["championat/triceps-pushdown.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4941031-5-luchshih-uprazhnenij-na-triceps-v-trenazhyornom-zale-dlya-muzhchin-ot-trenera.html"],
-  "cable-crunch": ["championat/cable-crunch.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4602635-molitva-uprazhnenie-na-press-na-trenazhyore-tehnika-vypolneniya-video.html"],
-  pallof: ["open-source/pallof-press-sequence.svg", "Bryl Lim", "CC BY-SA 4.0", "", "Три положения Pallof press.", "https://bryllim.github.io/workout-guide/exercises/pallof-press/"],
-  "goblet-squat": ["open-source/goblet-squat.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация приседа с гантелью у груди.", "https://bryllim.github.io/workout-guide/exercises/goblet-squat/"],
-  "dumbbell-bench": ["open-source/dumbbell-bench-press.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация жима гантелей лёжа.", "https://bryllim.github.io/workout-guide/exercises/dumbbell-bench-press/"],
-  "one-arm-row": ["open-source/one-arm-dumbbell-row.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация тяги гантели одной рукой с опорой.", "https://bryllim.github.io/workout-guide/exercises/one-arm-dumbbell-row/"],
-  "dumbbell-romanian-deadlift": ["open-source/dumbbell-romanian-deadlift.svg", "Everkinetic", "CC BY-SA 3.0", "Dumbbell dead lifts 2.svg", "Иллюстрация тазового наклона с гантелями.", "https://commons.wikimedia.org/wiki/File:Dumbbell_dead_lifts_2.svg"],
-  "barbell-hip-thrust": ["open-source/barbell-hip-thrust.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация ягодичного моста со штангой.", "https://bryllim.github.io/workout-guide/exercises/hip-thrust/"],
-  "dumbbell-incline-press": ["open-source/incline-dumbbell-press.svg", "Bryl Lim / Workout Guide", "CC BY-SA 4.0", "", "Иллюстрация жима гантелей на наклонной скамье.", "https://bryllim.github.io/workout-guide/exercises/incline-dumbbell-press/"],
-  "cable-leg-curl": ["open-source/cable-leg-curl.svg", "Ритм", "Авторская иллюстрация", "", "Сгибание ноги стоя с манжетой и нижним блоком.", ""],
-  deadlift: ["championat/deadlift.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5310910-stanovaya-tyaga-normativy-tehnika-vypolneniya-vidy-stanovoj-tyagi.html"],
-  "incline-press": ["championat/incline-press.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5782466-zhim-shtangi-na-naklonnoj-skame-tehnika-vypolneniya-kakie-myshcy-rabotayut.html"],
-  "lat-pulldown": ["championat/lat-pulldown.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5404742-tyaga-verhnego-bloka-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html"],
-  pullup: ["open-source/pullup-landscape.jpg", "PTPioneer (Tyler Read) / Wikimedia Commons", "CC BY 2.0", "", "Подтягивание на перекладине.", "https://commons.wikimedia.org/wiki/File:Pull-ups_exercise_from_back.jpg"],
-  "split-squat": ["championat/split-squat.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5138357-bolgarskie-vypady-pravilnaya-tehnika-i-glavnye-oshibki.html"],
-  "lateral-raise": ["championat/lateral-raise.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-5774694-mahi-gantelyami-v-storonu-kak-pravilno-delat-stoya-sidya-v-naklone-tehnika-vypolneniya.html"],
-  "biceps-curl": ["championat/biceps-curl.jpg", "Чемпионат", "изображение из статьи", "", "", "https://www.championat.com/lifestyle/article-4933279-4-luchshih-uprazhneniya-na-biceps-dlya-muzhchin-v-trenazhernom-zale.html"],
-};
 const exerciseHelp = {
   squat: ["Присед со штангой", "Приседай только в той глубине, где сохраняешь устойчивую стопу и положение спины.", "Настрой стойки примерно на высоте середины груди; расположи гриф на верхней части спины, а не на шее; возьмись симметрично и собери лопатки.; Сними гриф, отступи коротко и поставь стопы в устойчивую ширину; вдохни животом и напряги корпус кругом.; Начни одновременно сгибать колени и таз; колени веди в направлении носков, пятки и основание большого пальца оставляй прижатыми.; Опускайся до глубины, на которой не теряешь равновесие и контроль таза; не ищи глубину ценой боли или округления поясницы.; Оттолкнись всей стопой и поднимись; колени продолжают смотреть в сторону носков, корпус не раскачивай.; Сбрось вдох после трудной части повтора; между повторами восстанови напряжение. Частые ошибки: пятки отрываются, колени резко заваливаются внутрь, гриф уходит от середины стопы.", "Начни с пустого грифа и используй страховочные упоры, выставленные чуть ниже нижней точки приседа."],
   bench: ["Жим лёжа", "Поставь тело устойчиво и опускай гриф по контролируемой траектории к нижней части груди.", "Ляг так, чтобы глаза были примерно под грифом; стопы полностью на полу, голова и таз остаются на скамье.; Возьмись симметрично чуть шире плеч; сведи лопатки и мягко прижми их к скамье, сохраняя естественный прогиб.; Сними гриф над плечами; вдохни и опускай его плавно к нижней части груди, удерживая запястья над локтями.; Локти направляй по диагонали относительно корпуса, не разводи их строго в стороны; предплечья внизу близки к вертикали.; Выжми гриф вверх и немного назад к положению над плечами; не отбивай от груди и не отрывай таз.; Выдыхай во время выжима. Ошибки: неровный хват, потерянные лопатки, резкий отскок, боль в плече.", "Используй страховочные упоры или страхующего; прекращай подход, если штанга перестаёт двигаться под контролем."],
@@ -266,6 +242,39 @@ Object.assign(exerciseHelp, {
   "triceps-pushdown": ["Разгибание рук на блоке", "Прижми локти к бокам: движение происходит в локтевом суставе.", "Встань лицом к верхнему блоку и возьмись за рукоять на удобной ширине.; Держи корпус устойчиво, плечи опущены, локти возле боков.; На выдохе разогни руки вниз и коротко задержись.; На вдохе медленно согни локти и верни рукоять.; Не раскачивайся и не отводи локти в стороны.", "Не используй вес, который заставляет наваливаться на рукоять."],
   "cable-crunch": ["Скручивания на верхнем блоке («молитва»)", "Скручивай туловище, направляя рёбра к тазу; не тяни канат руками.", "Встань на колени перед верхним блоком и возьмись за канат.; Держи руки у головы, а таз относительно неподвижно.; Скругляя корпус, направляй грудную клетку к тазу и вниз.; Плавно вернись в исходное положение.; Не выполняй движение за счёт наклона в тазобедренных суставах или тяги руками.", "Для скручиваний используй умеренный вес и держи шею без напряжения."],
 });
+
+const muscleWikiExercisePages = {
+  squat: "barbell-squat",
+  bench: "barbell-bench-press",
+  row: "barbell-bent-over-row",
+  "romanian-deadlift": "barbell-romanian-deadlift",
+  "overhead-press": "dumbbell-seated-overhead-press",
+  "triceps-pushdown": "cable-rope-pushdown",
+  "cable-crunch": "cable-rope-kneeling-crunch",
+  pallof: "cable-pallof-press",
+  "goblet-squat": "dumbbell-goblet-squat",
+  "dumbbell-bench": "dumbbell-bench-press",
+  "one-arm-row": "dumbbell-single-arm-row",
+  "dumbbell-romanian-deadlift": "dumbbell-romanian-deadlift",
+  "barbell-hip-thrust": "barbell-hip-thrust",
+  "dumbbell-incline-press": "dumbbell-incline-bench-press",
+  deadlift: "barbell-deadlift",
+  "incline-press": "barbell-incline-bench-press",
+  "lat-pulldown": "cable-lat-pulldown",
+  pullup: "pull-ups",
+  "split-squat": "dumbbell-bulgarian-split-squat",
+  "lateral-raise": "dumbbell-lateral-raise",
+  "side-plank": "elbow-side-plank",
+  "leg-press": "machine-leg-press",
+  "cable-leg-curl": "cable-single-leg-laying-leg-curl",
+};
+
+const muscleWikiExerciseCategories = {
+  "supported-row": "lats",
+  "cable-leg-curl": "hamstrings",
+  "biceps-curl": "biceps",
+  "leg-curl": "hamstrings",
+};
 
 function loadData() {
   try {
@@ -866,65 +875,28 @@ function openExerciseHelp(id) {
     libraryCard.steps || "Установи устойчивое исходное положение.; Выполняй движение плавно и контролируй возвращение в исходное положение.; Остановись, если появляется боль или теряется техника.",
     "Начни с лёгкой нагрузки и увеличивай её постепенно, сохраняя контроль движения.",
   ] : exerciseHelp.general);
-  const source = {
-    "goblet-squat": "https://www.championat.com/lifestyle/article-4869565-s-chego-nachat-trenirovku-v-trenazhernom-zale-devushke-bez-trenera-kompleks-uprazhnenij-dlya-novichkov.html",
-    "dumbbell-bench": "https://www.championat.com/lifestyle/article-4869565-s-chego-nachat-trenirovku-v-trenazhernom-zale-devushke-bez-trenera-kompleks-uprazhnenij-dlya-novichkov.html",
-    "one-arm-row": "https://www.championat.com/lifestyle/article-5414120-tyaga-ganteli-k-poyasu-tehnika-uprazhneniya-kakie-myshschy-rabotayut.html",
-    "dumbbell-romanian-deadlift": "https://www.championat.com/lifestyle/article-5710238-rumynskaya-tyaga-so-shtangoj-tehnika-vypolneniya-kakie-myshcy-rabotayut-kak-pravilno-delat-uprazhnenie.html",
-    "barbell-hip-thrust": "https://www.championat.com/lifestyle/article-5224419-yagodnichnyj-mostik-kak-pravilno-delat-uprazhnenie-tehnika.html",
-    "dumbbell-incline-press": "https://www.championat.com/lifestyle/article-5284038-zhim-gantelej-na-naklonnoj-skame-tehnika-uprazhneniya-i-kakie-myshcy-rabotayut.html",
-    squat: "https://www.championat.com/lifestyle/article-5167991-chto-takoe-olimpijskie-prisedaniya-prisedaniya-so-shtangoj-na-spine.html",
-    bench: "https://www.championat.com/lifestyle/article-4488421-kak-pravilno-delat-bazovye-uprazhneniya-bezopasnaya-tehnika-zhima-lezha-stanovoj-tyagi-prisedanij-so-shtangoj.html",
-    row: "https://www.championat.com/lifestyle/article-5388400-tyaga-shtangi-v-naklone-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html",
-    "romanian-deadlift": "https://www.championat.com/lifestyle/article-5710238-rumynskaya-tyaga-so-shtangoj-tehnika-vypolneniya-kakie-myshcy-rabotayut-kak-pravilno-delat-uprazhnenie.html",
-    "overhead-press": "https://www.championat.com/lifestyle/article-5809758-zhim-gantelej-sidya-tehnika-vypolneniya-kakie-myshcy-rabotayut.html",
-    "triceps-pushdown": "https://www.championat.com/lifestyle/article-4941031-5-luchshih-uprazhnenij-na-triceps-v-trenazhyornom-zale-dlya-muzhchin-ot-trenera.html",
-    "cable-crunch": "https://www.championat.com/lifestyle/article-4602635-molitva-uprazhnenie-na-press-na-trenazhyore-tehnika-vypolneniya-video.html",
-    pallof: "https://bryllim.github.io/workout-guide/exercises/pallof-press/",
-    deadlift: "https://www.championat.com/lifestyle/article-5310910-stanovaya-tyaga-normativy-tehnika-vypolneniya-vidy-stanovoj-tyagi.html",
-    "incline-press": "https://www.championat.com/lifestyle/article-5782466-zhim-shtangi-na-naklonnoj-skame-tehnika-vypolneniya-kakie-myshcy-rabotayut.html",
-    pullup: "https://www.championat.com/lifestyle/article-4201533-kak-nauchitsja-podtjagivatsya-sovety-fitnes-trenera-kompleks-uprazhnenij-s-turnikom-video.html",
-    "lat-pulldown": "https://www.championat.com/lifestyle/article-5404742-tyaga-verhnego-bloka-tehnika-uprazhneniya-kakie-myshcy-rabotayut.html",
-    "split-squat": "https://www.championat.com/lifestyle/article-5138357-bolgarskie-vypady-pravilnaya-tehnika-i-glavnye-oshibki.html",
-    "cable-leg-curl": "https://www.championat.com/lifestyle/article-5073789-kak-nakachat-zadnyuyu-poverhnost-bedra-top-11-uprazhnenij-dlya-uprugoj-i-silnoj-zadnej-poverhnosti-bedra.html",
-    "lateral-raise": "https://www.championat.com/lifestyle/article-5774694-mahi-gantelyami-v-storonu-kak-pravilno-delat-stoya-sidya-v-naklone-tehnika-vypolneniya.html",
-    "biceps-curl": "https://www.championat.com/lifestyle/article-4933279-4-luchshih-uprazhneniya-na-biceps-dlya-muzhchin-v-trenazhernom-zale.html",
-  };
-  const sourceLink = document.querySelector("#exercise-source");
-  sourceLink.hidden = Boolean(libraryCard?.custom);
-  sourceLink.href = source[id] || "https://www.championat.com/articles/lifestyle/1.html";
-  sourceLink.textContent = source[id]?.includes("championat.com") ? "Источник: Чемпионат ↗" : source[id] ? "Источник упражнения ↗" : "Открыть раздел тренировок Чемпионата ↗";
+  const muscleWikiSlug = muscleWikiExercisePages[id];
+  const muscleWikiCategory = muscleWikiExerciseCategories[id];
+  const muscleWikiUrl = muscleWikiSlug
+    ? `https://musclewiki.com/ru-ru/exercise/${muscleWikiSlug}`
+    : muscleWikiCategory
+      ? `https://musclewiki.com/ru-ru/exercises/${muscleWikiCategory}`
+      : "https://musclewiki.com/ru-ru/exercises";
+  const muscleWikiCard = document.querySelector("#exercise-musclewiki-card");
+  const muscleWikiLink = document.querySelector("#exercise-musclewiki-link");
+  muscleWikiCard.hidden = false;
+  muscleWikiLink.href = muscleWikiUrl;
+  muscleWikiLink.textContent = muscleWikiSlug ? "Анимация и описание на MuscleWiki ↗" : "Открыть библиотеку MuscleWiki ↗";
+  document.querySelector("#exercise-musclewiki-note").textContent = muscleWikiSlug
+    ? "На странице MuscleWiki доступны демонстрация движения и инструкция по шагам."
+    : muscleWikiCategory
+      ? "Точной карточки этого варианта в каталоге не нашёл. Открой раздел по целевой группе и выбери ближайшее упражнение."
+      : `Найди «${h[0]}» в библиотеке MuscleWiki: на страницах упражнений есть демонстрации и инструкции.`;
   document.querySelector("#exercise-dialog-title").textContent = h[0];
   document.querySelector("#exercise-dialog-summary").textContent = h[1];
   document.querySelector("#exercise-steps").innerHTML = h[2].split(/;\s*|\n+/).map((x) => x.trim()).filter(Boolean)
     .map((x) => `<li>${escapeHtml(x.charAt(0).toLocaleUpperCase("ru-RU") + x.slice(1))}</li>`).join("");
   document.querySelector("#exercise-cue").textContent = h[3];
-  const image = exerciseImages[id];
-  const imageWrap = document.querySelector("#exercise-image-wrap");
-  const exerciseImage = document.querySelector("#exercise-image");
-  const imageCredit = document.querySelector("#exercise-image-credit");
-  imageWrap.hidden = false;
-  if (image) {
-    imageWrap.classList.remove("is-unavailable");
-    imageWrap.classList.toggle("is-pullup-photo", id === "pullup");
-    imageWrap.classList.toggle("is-pallof-sequence", id === "pallof");
-    exerciseImage.hidden = false;
-    exerciseImage.src = `images/exercises/${image[0].includes("/") ? image[0] : `open-source/${image[0]}`}`;
-    exerciseImage.alt = `Иллюстрация: ${h[0]}`;
-    const imageCreditHtml = image[5]
-      ? `<a href="${escapeHtml(image[5])}" target="_blank" rel="noreferrer">${escapeHtml(image[1])} · ${escapeHtml(image[2])} · источник ↗</a>`
-      : image[2] === "Авторская иллюстрация"
-        ? `${escapeHtml(image[1])} · ${escapeHtml(image[2])}`
-        : `<a href="https://commons.wikimedia.org/wiki/File:${encodeURIComponent(image[3]).replaceAll("%20", "_")}" target="_blank" rel="noreferrer">${escapeHtml(image[3].replaceAll("_", " "))} · ${escapeHtml(image[1])} · ${escapeHtml(image[2])} · страница файла ↗</a>`;
-    imageCredit.innerHTML = `${escapeHtml(image[4] ? image[4] + " " : "")}${imageCreditHtml}`;
-  } else {
-    imageWrap.hidden = true;
-    imageWrap.classList.add("is-unavailable");
-    exerciseImage.hidden = true;
-    exerciseImage.removeAttribute("src");
-    exerciseImage.alt = "";
-    imageCredit.textContent = "Иллюстрация для этого упражнения пока не добавлена.";
-  }
   showDialog("exercise-dialog");
 }
 function bindHelpLinks() { document.querySelectorAll("[data-help]").forEach((b) => b.addEventListener("click", () => openExerciseHelp(b.dataset.help))); }

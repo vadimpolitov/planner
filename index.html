@@ -153,8 +153,16 @@
       <section class="app-dialog exercise-dialog" role="dialog" aria-modal="true" aria-labelledby="exercise-dialog-title">
         <button class="dialog-close" type="button" data-close-dialog="exercise-dialog" aria-label="Закрыть">×</button>
         <p class="eyebrow">СПРАВКА ОБ УПРАЖНЕНИИ</p><h2 id="exercise-dialog-title"></h2><p id="exercise-dialog-summary" class="dialog-description"></p>
-        <figure id="exercise-image-wrap" class="exercise-image-wrap" hidden><img id="exercise-image" alt="" /><figcaption id="exercise-image-credit"></figcaption></figure>
-        <div class="technique-block"><h3>Выполнение по шагам</h3><ol id="exercise-steps"></ol></div><section class="exercise-cue-block"><h3>Важные ориентиры</h3><p id="exercise-cue" class="exercise-cue"></p></section><a id="exercise-source" class="exercise-source" href="&#104;&#116;&#116;&#112;&#115;://www.acefitness.org/resources/everyone/exercise-library/" target="_blank" rel="noreferrer">Открыть библиотеку упражнений ↗</a>
+        <section id="exercise-musclewiki-card" class="exercise-musclewiki-card" aria-label="Материалы MuscleWiki" hidden>
+          <span class="exercise-musclewiki-mark" aria-hidden="true">MW</span>
+          <div class="exercise-musclewiki-copy">
+            <p class="eyebrow">MUSCLEWIKI</p>
+            <h3>Анимация и инструкция по технике</h3>
+            <p id="exercise-musclewiki-note">Демонстрация движения и подробные подсказки откроются на сайте источника.</p>
+            <a id="exercise-musclewiki-link" class="exercise-musclewiki-link" href="https://musclewiki.com/exercises" target="_blank" rel="noopener noreferrer">Открыть MuscleWiki ↗</a>
+          </div>
+        </section>
+        <div class="technique-block"><h3>Выполнение по шагам</h3><ol id="exercise-steps"></ol></div><section class="exercise-cue-block"><h3>Важные ориентиры</h3><p id="exercise-cue" class="exercise-cue"></p></section>
       </section>
     </div>
     <div class="dialog-backdrop" id="finish-dialog" hidden>
@@ -164,6 +172,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=2.1"></script>
+    <script src="script.js?v=2.2"></script>
   </body>
 </html>

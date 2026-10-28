@@ -1,4 +1,4 @@
-const CACHE_NAME = "ritm-app-shell-v4";
+const CACHE_NAME = "ritm-app-shell-v5";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -9,31 +9,6 @@ const APP_FILES = [
   "./icons/ritm-192.png",
   "./icons/ritm-512.png",
   "./icons/ritm-maskable-512.png",
-  "./images/exercises/open-source/bench.png",
-  "./images/exercises/open-source/biceps-curl.png",
-  "./images/exercises/open-source/bulgarian-split-squat.png",
-  "./images/exercises/open-source/cable-crunch.png",
-  "./images/exercises/open-source/deadlift.jpg",
-  "./images/exercises/open-source/goblet-squat.svg",
-  "./images/exercises/open-source/dumbbell-bench-press.svg",
-  "./images/exercises/open-source/one-arm-dumbbell-row.svg",
-  "./images/exercises/open-source/dumbbell-romanian-deadlift.svg",
-  "./images/exercises/open-source/barbell-hip-thrust.svg",
-  "./images/exercises/open-source/incline-dumbbell-press.svg",
-  "./images/exercises/open-source/cable-leg-curl.svg",
-  "./images/exercises/open-source/incline-press.png",
-  "./images/exercises/open-source/lateral-raise.png",
-  "./images/exercises/open-source/leg-curl.png",
-  "./images/exercises/open-source/pallof-press-sequence.svg",
-  "./images/exercises/open-source/pallof-press.svg",
-  "./images/exercises/open-source/pullup-commons.jpg",
-  "./images/exercises/open-source/pullup-landscape.jpg",
-  "./images/exercises/open-source/pullup.jpg",
-  "./images/exercises/open-source/romanian-deadlift.png",
-  "./images/exercises/open-source/row.svg.png",
-  "./images/exercises/open-source/shoulder-press.png",
-  "./images/exercises/open-source/squat.png",
-  "./images/exercises/open-source/triceps-pushdown.png"
 ];
 
 self.addEventListener("install", (event) => {

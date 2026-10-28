@@ -424,14 +424,21 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .editor-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .exercise-card-preview { margin:-5px 0 0; padding:9px 10px; border-radius:7px; color:#637166; background:#f6f8f4; font-size:10px; line-height:1.5; }
 .exercise-card-preview span { display:block; margin-bottom:3px; color:#91a08f; font-size:8px; font-weight:700; letter-spacing:.6px; }
-.exercise-source[hidden] { display:none; }
+.exercise-musclewiki-card[hidden] { display:none; }
+.exercise-musclewiki-card { display:flex; align-items:flex-start; gap:14px; margin:14px 0; padding:16px; border:1px solid var(--line); border-radius:14px; background:#f1f6ec; }
+.exercise-musclewiki-mark { display:grid; flex:0 0 42px; width:42px; height:42px; place-items:center; border-radius:12px; background:#b2f260; color:#203128; font-size:13px; font-weight:800; }
+.exercise-musclewiki-copy { min-width:0; }
+.exercise-musclewiki-copy .eyebrow { margin:0 0 5px; }
+.exercise-musclewiki-copy h3 { margin:0 0 6px; font-size:16px; }
+.exercise-musclewiki-copy > p:not(.eyebrow) { margin:0 0 12px; color:#627268; font-size:13px; line-height:1.5; }
+.exercise-musclewiki-link { display:inline-flex; align-items:center; min-height:42px; padding:0 14px; border-radius:10px; background:#b2f260; color:#203128; font-size:13px; font-weight:750; text-decoration:none; }
+.exercise-musclewiki-link:hover { background:#a5e84f; }
 .plan-editor-row > label select { width:100%; }
 .exercise-help-link { padding:0; border:0; color:inherit; background:none; font:inherit; text-align:left; }.exercise-help-link:hover { text-decoration:underline; }
 .technique-block li { margin:10px 0; line-height:1.65; }
 .exercise-cue-block { margin-top:18px; padding:13px 15px; border-radius:9px; background:#f2f6ed; }
 .exercise-cue-block h3 { margin:0 0 6px; font-size:13px; }
 .exercise-cue { margin:0; color:#536057; font-size:12px; line-height:1.6; }
-.exercise-source { display:inline-block; margin-top:14px; color:#496b35; font-size:12px; font-weight:700; }
 @media(max-width:700px){.calendar-layout{grid-template-columns:1fr}.calendar-add{width:100%}.calendar-day{min-height:54px;padding:4px}.calendar-panel,.selected-day-panel{padding:12px}.plan-card-header{flex-wrap:wrap}}
 
 
@@ -442,23 +449,11 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .inline-timer { min-height:28px; padding:3px 7px; border-radius:6px; }
 .inline-timer { min-height:44px; padding:8px 10px; }
 .inline-timer:hover { background:#f2f6ed; }
-.exercise-image-wrap { margin:14px 0; padding:10px; border:1px solid var(--line); border-radius:10px; background:#f9fbf7; }
-.exercise-image-wrap[hidden] { display:none; }
-.exercise-image-wrap.is-unavailable { display:grid; min-height:92px; place-items:center; text-align:center; }
-.exercise-image-wrap.is-unavailable figcaption { max-width:32em; margin:0; }
-.exercise-image-wrap img { display:block; width:100%; max-height:310px; object-fit:contain; border-radius:6px; background:#fff; }
-.exercise-image-wrap.is-pullup-photo img { height:clamp(190px, 36vw, 310px); max-height:none; object-fit:cover; object-position:center 42%; }
-.exercise-image-wrap.is-pallof-sequence img { height:auto; max-height:310px; object-fit:contain; background:#e8f0ea; }
-.exercise-image-wrap figcaption { margin-top:8px; color:#778179; font-size:10px; line-height:1.5; }
-.exercise-image-wrap figcaption a { color:#496b35; }
 .history-exercises .history-exercise-done strong { color:#4f7437; }
 @media(max-width:620px) {
   .exercise-title { flex-wrap:wrap; }
   .exercise-title > div { flex:1 1 calc(100% - 90px); }
   .exercise-done-button { margin-left:auto; }
-  .exercise-image-wrap img { max-height:250px; }
-  .exercise-image-wrap.is-pullup-photo img { height:clamp(180px, 56vw, 250px); max-height:none; }
-  .exercise-image-wrap.is-pallof-sequence img { max-height:220px; }
 }
 
 
