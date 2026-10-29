@@ -867,6 +867,11 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 .replace-exercise-button:hover { background:#edf5e8; }
 :root[data-theme="dark"] .replace-exercise-button { color:#c5e8ac; border-color:#45604a; }
 :root[data-theme="dark"] .replace-exercise-button:hover { background:#304a35; }
+.rir-field,.discomfort-card label { display:grid; gap:7px; margin-top:12px; color:var(--ink); font-size:13px; }
+.rir-field select,.discomfort-card select,.discomfort-card textarea { width:100%; min-height:44px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--ink); font:inherit; }
+.discomfort-card { margin:12px 0; padding:14px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+.discomfort-card label:first-child { margin-top:0; }
+.discomfort-card [hidden], #edit-discomfort-label[hidden] { display:none; }
 :root[data-theme="dark"] .profile-switcher select { color:#e4f0e5; }
 :root[data-theme="dark"] .body-stat-card > strong small { color:#b5c4b8; }
 :root[data-theme="dark"] .plan-editor-row > summary::after { color:#b5c4b8; }

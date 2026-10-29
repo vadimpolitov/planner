@@ -204,6 +204,7 @@ let selectedEditorWorkout = "A";
 let editingBodyDate = null;
 let editingSessionId = null;
 let replacingExerciseIndex = null;
+let pairWeightTarget = null;
 const exerciseHelp = {
   squat: ["Присед со штангой", "Приседай только в той глубине, где сохраняешь устойчивую стопу и положение спины.", "Настрой стойки примерно на высоте середины груди; расположи гриф на верхней части спины, а не на шее; возьмись симметрично и собери лопатки.; Сними гриф, отступи коротко и поставь стопы в устойчивую ширину; вдохни животом и напряги корпус кругом.; Начни одновременно сгибать колени и таз; колени веди в направлении носков, пятки и основание большого пальца оставляй прижатыми.; Опускайся до глубины, на которой не теряешь равновесие и контроль таза; не ищи глубину ценой боли или округления поясницы.; Оттолкнись всей стопой и поднимись; колени продолжают смотреть в сторону носков, корпус не раскачивай.; Сбрось вдох после трудной части повтора; между повторами восстанови напряжение. Частые ошибки: пятки отрываются, колени резко заваливаются внутрь, гриф уходит от середины стопы.", "Начни с пустого грифа и используй страховочные упоры, выставленные чуть ниже нижней точки приседа."],
   bench: ["Жим лёжа", "Поставь тело устойчиво и опускай гриф по контролируемой траектории к нижней части груди.", "Ляг так, чтобы глаза были примерно под грифом; стопы полностью на полу, голова и таз остаются на скамье.; Возьмись симметрично чуть шире плеч; сведи лопатки и мягко прижми их к скамье, сохраняя естественный прогиб.; Сними гриф над плечами; вдохни и опускай его плавно к нижней части груди, удерживая запястья над локтями.; Локти направляй по диагонали относительно корпуса, не разводи их строго в стороны; предплечья внизу близки к вертикали.; Выжми гриф вверх и немного назад к положению над плечами; не отбивай от груди и не отрывай таз.; Выдыхай во время выжима. Ошибки: неровный хват, потерянные лопатки, резкий отскок, боль в плече.", "Используй страховочные упоры или страхующего; прекращай подход, если штанга перестаёт двигаться под контролем."],
@@ -362,9 +363,12 @@ function normalizeCurrentSession(draft, plans) {
       return {
         optionIndex: Math.max(0, Math.min((exercise.options || [exercise.name]).length - 1, Number(entry.optionIndex) || 0)),
         completed: Boolean(entry.completed),
+        rir: ["0", "1", "2", "3", "4+"].includes(String(entry.rir)) ? String(entry.rir) : "",
         sets: Array.from({ length: setCount }, (_, setIndex) => ({
           weight: String(sets[setIndex]?.weight ?? ""),
           reps: String(sets[setIndex]?.reps ?? ""),
+          weightBasis: sets[setIndex]?.weightBasis === "total" ? "total" : "",
+          pairWeights: Array.isArray(sets[setIndex]?.pairWeights) && sets[setIndex].pairWeights.length === 2 ? sets[setIndex].pairWeights.map(String) : null,
         })),
       };
     }),
@@ -651,7 +655,7 @@ function compareExerciseSets(current, previous) {
   const valid = (set) => String(set?.weight ?? "").trim() !== "" && String(set?.reps ?? "").trim() !== ""
     && Number.isFinite(Number(set.weight)) && Number(set.weight) >= 0
     && Number.isInteger(Number(set.reps)) && Number(set.reps) >= 0;
-  if (!a.every(valid) || !b.every(valid) || !a.every((set, index) => Number(set.weight) === Number(b[index].weight))) return null;
+  if (!a.every(valid) || !b.every(valid) || !a.every((set, index) => set.weightBasis === "total" && b[index].weightBasis === "total" && Number(set.weight) === Number(b[index].weight))) return null;
   return a.reduce((sum, set) => sum + Number(set.reps), 0) - b.reduce((sum, set) => sum + Number(set.reps), 0);
 }
 
@@ -1088,6 +1092,7 @@ function startWorkout(scheduleId = "") {
       id: `session-${Date.now()}`,
       workout,
       planSnapshot: plan,
+      originalPlanSnapshot: structuredClone(plan),
       date: localDateKey(),
       scheduledDate: scheduled?.date || "",
       scheduleId: scheduled?.id || "",
@@ -1114,12 +1119,23 @@ function lastExerciseEntry(exerciseName) {
   return previousEntry(exerciseName);
 }
 
+function usesPairOfDumbbells(name) {
+  const n = exerciseNameKey(name);
+  if (/одной|одна|одну|одноруч/.test(n)) return false;
+  return /гантел(?:ей|ями)|(?:две|2)\s+гантели|(?:две|2)\s+гири|двумя гирями|с гирями/.test(n);
+}
+
+function rirOptions(value) {
+  return [["", "Не указано"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4+", "4 и более"]].map(([v, label]) => `<option value="${v}" ${String(value ?? "") === v ? "selected" : ""}>${label}</option>`).join("");
+}
+
 function progressionHint(exercise, name) {
   const last = lastExerciseEntry(name);
   if (!last || !last.sets?.length) return "Запиши первый результат — он станет точкой отсчёта.";
+  if (last.sets.some((set) => String(set.weight ?? "").trim() !== "" && set.weightBasis !== "total")) return `В прошлый раз: ${last.sets.map((set) => `${set.weight || "—"} кг × ${set.reps || "—"}`).join(" · ")}. В старой записи способ указания веса не уточнён.`;
   const reachedTop = last.sets.length === Number(exercise.sets) && last.sets.every((set) => String(set.reps ?? "").trim() !== "" && Number(set.reps) >= exercise.max);
   if (!reachedTop) return `В прошлый раз: ${last.sets.map((set) => `${set.weight || "—"} кг × ${set.reps || "—"}`).join(" · ")}. Сначала постарайся достичь верхней границы во всех подходах.`;
-  return "В прошлый раз верхняя граница выполнена во всех подходах. При хорошей технике можно рассмотреть небольшое увеличение веса.";
+  return "В прошлый раз верхняя граница выполнена во всех подходах. Учитывай технику и запас повторов перед изменением веса.";
 }
 
 function renderSession() {
@@ -1127,7 +1143,7 @@ function renderSession() {
   if (!draft) return showView("overview");
   const plan = draft.planSnapshot || workoutPlans[draft.workout];
   document.querySelector("#session-date").textContent = formatDate(draft.date, { day: "numeric", month: "long", year: "numeric" });
-  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><details class="warmup-card"><summary>Разминка</summary><p>5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></details><div class="session-tools"><span>5 сигналов и гонг${window.RitmTimer ? "" : " · фоновый звук зависит от браузера"}.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
+  document.querySelector("#session-content").innerHTML = `<div class="session-heading"><div><p class="eyebrow">СИЛОВАЯ · ${draft.workout}</p><h1 id="session-title">${escapeHtml(plan.name)}</h1><p>${escapeHtml(plan.subtitle)}</p></div><span class="workout-badge large">${draft.workout}</span></div><details class="warmup-card"><summary>Разминка</summary><p>5–7 минут лёгкого кардио и 2–4 разминочных подхода первого упражнения.</p></details><div class="session-tools"><span>5 сигналов и гонг${window.RitmTimer ? "" : " · фоновый звук зависит от браузера"}.</span><div class="rest-timer-controls"><label class="visually-hidden" for="timer-preset">Длительность отдыха</label><select id="timer-preset"><optgroup label="Изоляция · 60–90 секунд"><option value="60">1:00</option><option value="75">1:15</option><option value="90">1:30</option></optgroup><optgroup label="Базовые · 2–3 минуты"><option value="120">2:00</option><option value="150" selected>2:30</option><option value="180">3:00</option></optgroup></select><button type="button" class="timer-button" id="timer-button"><span id="timer-label">Запустить отдых</span></button></div><div class="timer-display" id="timer-display" hidden><div class="timer-display-header"><span id="timer-status" aria-live="polite">Отдых</span><strong id="timer-time" aria-live="off">00:00</strong></div><div class="timer-track" aria-hidden="true"><span id="timer-progress"></span></div></div></div><div class="session-exercises">${plan.exercises.map((exercise, index) => renderExercise(exercise, index, draft.entries[index])).join("")}</div><section class="effort-card"><label for="effort-input"><strong>Общая тяжесть тренировки</strong><span>Оцени от 1 до 10</span></label><div class="effort-control"><input id="effort-input" type="range" min="1" max="10" value="${escapeHtml(draft.effort || 6)}" aria-describedby="effort-value" /><strong id="effort-value">${draft.effort ? `${escapeHtml(draft.effort)}/10` : "Не оценено"}</strong></div></section><section class="discomfort-card"><label>Был дискомфорт? <select id="discomfort-status"><option value="" ${!draft.discomfortStatus ? "selected" : ""}>Не указано</option><option value="no" ${draft.discomfortStatus === "no" ? "selected" : ""}>Нет</option><option value="yes" ${draft.discomfortStatus === "yes" ? "selected" : ""}>Да</option></select></label><label id="discomfort-label" ${draft.discomfortStatus === "yes" ? "" : "hidden"}>Опишите дискомфорт<textarea id="discomfort-note" rows="3" maxlength="500">${escapeHtml(draft.discomfortNote || "")}</textarea></label></section><div class="finish-row"><p>Тренировка сохраняется автоматически на этом устройстве.</p><div class="finish-actions"><button class="danger-text-button cancel-workout-button" id="cancel-workout" type="button">Отменить тренировку</button><button class="primary-button finish-button" id="finish-workout" type="button">Завершить тренировку <span>✓</span></button></div></div>`;
   bindSessionEvents();
   if (restTimer.interval || restTimer.finished) updateRestTimer();
 }
@@ -1142,11 +1158,45 @@ function renderExercise(exercise, index, entry) {
   const firstOpenSet = sets.findIndex((set) => String(set.reps).trim() === "");
   const setRows = sets.map((set, setIndex) => {
     const logged = String(set.reps).trim() !== "";
-    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><div class="set-field"><label for="weight-${index}-${setIndex}">Вес, кг</label><div class="set-value-control"><input id="weight-${index}-${setIndex}" aria-label="Вес, килограммы, подход ${setIndex + 1}" type="number" inputmode="decimal" min="0" step="any" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="weight" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать вес, подход ${setIndex + 1}" title="Выбрать вес">⌄</button></div></div><div class="set-field"><label for="reps-${index}-${setIndex}">Повторы</label><div class="set-value-control"><input id="reps-${index}-${setIndex}" aria-label="Повторения, подход ${setIndex + 1}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="reps" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать повторы, подход ${setIndex + 1}" title="Выбрать повторы">⌄</button></div></div><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
+    return `<div class="set-row ${logged ? "is-set-complete" : ""} ${setIndex === firstOpenSet ? "is-next-set" : ""}"><span class="set-number">${String(setIndex + 1).padStart(2, "0")}</span><div class="set-field"><label for="weight-${index}-${setIndex}">Вес, кг</label><div class="set-value-control"><input id="weight-${index}-${setIndex}" aria-label="Вес, килограммы, подход ${setIndex + 1}" type="number" inputmode="decimal" min="0" step="any" placeholder="—" value="${escapeHtml(set.weight)}" data-set-field="weight" data-exercise="${index}" data-set="${setIndex}" ${usesPairOfDumbbells(name) ? "readonly data-pair-weight" : ""} /><button type="button" class="value-picker-trigger" data-value-picker="weight" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать вес, подход ${setIndex + 1}" title="Выбрать вес">⌄</button></div></div><div class="set-field"><label for="reps-${index}-${setIndex}">Повторы</label><div class="set-value-control"><input id="reps-${index}-${setIndex}" aria-label="Повторения, подход ${setIndex + 1}" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="${exercise.min}–${exercise.max}" value="${escapeHtml(set.reps)}" data-set-field="reps" data-exercise="${index}" data-set="${setIndex}" /><button type="button" class="value-picker-trigger" data-value-picker="reps" data-exercise="${index}" data-set="${setIndex}" aria-label="Выбрать повторы, подход ${setIndex + 1}" title="Выбрать повторы">⌄</button></div></div><span class="set-check" aria-label="${logged ? "Подход записан" : "Подход ещё не записан"}">${logged ? "✓" : "·"}</span></div>`;
   }).join("");
   const difference = compareExerciseSets(entry, lastExerciseEntry(name));
   const comparison = difference === null ? "" : difference > 0 ? `↑ На ${difference} повторов больше при тех же весах` : difference === 0 ? "Результат совпадает с прошлым при тех же весах" : `На ${Math.abs(difference)} повторов меньше при тех же весах`;
-  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><button class="replace-exercise-button" type="button" data-replace-exercise="${index}" aria-label="Заменить упражнение ${escapeHtml(name)}">Заменить упражнение</button><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><p class="exercise-comparison" aria-live="polite" ${comparison ? "" : "hidden"}>${escapeHtml(comparison)}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
+  return `<article class="exercise-card ${completed ? "exercise-completed" : ""}" data-exercise-card="${index}"><div class="exercise-title"><span class="exercise-number">${String(index + 1).padStart(2, "0")}</span><div><h3><button class="exercise-help-link" type="button" data-help="${escapeHtml(exercise.optionHelpIds?.[entry.optionIndex] || exercise.helpId || "general")}">${escapeHtml(name)} ⓘ</button></h3><p>${exercise.sets} рабочих подхода · ${exercise.min}–${exercise.max} повторений${exercise.sideNote ? ` · ${escapeHtml(exercise.sideNote)}` : ""}</p></div>${alternatives.length > 1 ? `<label class="visually-hidden" for="variant-${index}">Вариант упражнения</label><select class="variant-select" id="variant-${index}" data-variant="${index}">${alternatives.map((option, optionIndex) => `<option value="${optionIndex}" ${entry.optionIndex === optionIndex ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>` : ""}<button type="button" class="exercise-done-button" data-toggle-exercise="${index}" aria-pressed="${completed}">${completed ? "✓ Выполнено" : "Отметить"}</button></div><button class="replace-exercise-button" type="button" data-replace-exercise="${index}" aria-label="Заменить упражнение ${escapeHtml(name)}">Заменить упражнение</button><p class="progression-hint">${escapeHtml(progressionHint(exercise, name))}</p><p class="exercise-comparison" aria-live="polite" ${comparison ? "" : "hidden"}>${escapeHtml(comparison)}</p><div class="exercise-log-progress"><span class="exercise-log-count">${loggedSets} из ${sets.length} подходов записано</span><div role="progressbar" aria-label="Заполненные подходы" aria-valuemin="0" aria-valuemax="${sets.length}" aria-valuenow="${loggedSets}"><i style="width:${progress}%"></i></div></div><div class="set-table"><div class="set-table-head"><span>Подход</span><span>Общий вес, кг</span><span>Повторения</span><span></span></div>${setRows}</div><label class="rir-field">Запас повторов в последнем подходе <select data-rir="${index}">${rirOptions(entry.rir)}</select></label><p class="rest-hint">Отдых: ${exercise.rest === "long" ? "2–3 минуты" : "60–90 секунд"} <button type="button" class="inline-timer" data-rest="${exercise.rest}">Запустить отдых</button></p></article>`;
+}
+
+function openPairWeight(index, setIndex) {
+  const set = data.currentSession?.entries[index]?.sets[setIndex];
+  if (!set) return;
+  const draft = data.currentSession, exercise = (draft.planSnapshot || workoutPlans[draft.workout]).exercises[index];
+  const name = (exercise.options || [exercise.name])[draft.entries[index].optionIndex] || exercise.name;
+  const isKettlebell = /гир/.test(exerciseNameKey(name));
+  pairWeightTarget = { index, setIndex };
+  const form = document.querySelector("#pair-weight-form");
+  document.querySelector("#pair-weight-title").textContent = isKettlebell ? "Вес двух гирь" : "Вес двух гантелей";
+  document.querySelector("#pair-weight-description").textContent = isKettlebell ? "Укажи вес каждой гири. В подход запишется общий вес пары." : "Укажи вес каждой гантели. В подход запишется общий вес пары.";
+  form.elements.first.parentElement.firstChild.textContent = isKettlebell ? "Первая гиря, кг" : "Первая гантель, кг";
+  form.elements.second.parentElement.firstChild.textContent = isKettlebell ? "Вторая гиря, кг" : "Вторая гантель, кг";
+  form.elements.first.value = set.pairWeights?.[0] ?? "";
+  form.elements.second.value = set.pairWeights?.[1] ?? "";
+  document.querySelector("#pair-weight-sum").textContent = set.weight ? `Текущий общий вес: ${set.weight} кг` : "";
+  showDialog("pair-weight-dialog");
+}
+
+function savePairWeight(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!form.reportValidity() || !pairWeightTarget) return;
+  const { index, setIndex } = pairWeightTarget;
+  const set = data.currentSession?.entries[index]?.sets[setIndex];
+  const input = document.querySelector(`#weight-${index}-${setIndex}`);
+  if (!set || !input) return;
+  const first = form.elements.first.value, second = form.elements.second.value;
+  set.pairWeights = [first, second];
+  input.value = String(Number((Number(first) + Number(second)).toFixed(4)));
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  closeDialog(document.querySelector("#pair-weight-dialog"));
+  pairWeightTarget = null;
 }
 
 function openValuePicker(trigger) {
@@ -1159,6 +1209,7 @@ function openValuePicker(trigger) {
   const input = document.querySelector(`#${field}-${exerciseIndex}-${setIndex}`);
   if (!entry || !exercise || !input) return;
   const exerciseName = (exercise.options || [exercise.name])[entry.optionIndex] || exercise.name;
+  if (field === "weight" && usesPairOfDumbbells(exerciseName)) { openPairWeight(exerciseIndex, setIndex); return; }
   const previous = [...data.sessions].reverse().flatMap((session) => [...session.entries].reverse()
     .filter((item) => item.name === exerciseName).flatMap((item) => [...item.sets].reverse()));
   const recent = [...entry.sets].reverse().concat(previous).map((set) => String(set[field] ?? "").trim())
@@ -1190,7 +1241,7 @@ function openValuePicker(trigger) {
 }
 
 function entryHasRecordedWork(entry) {
-  return Boolean(entry.completed || entry.sets.some((set) => String(set.weight ?? "").trim() !== "" || String(set.reps ?? "").trim() !== ""));
+  return Boolean(entry.completed || String(entry.rir ?? "") !== "" || entry.sets.some((set) => String(set.weight ?? "").trim() !== "" || String(set.reps ?? "").trim() !== ""));
 }
 
 function renderReplacementOptions() {
@@ -1257,6 +1308,11 @@ function replaceExercise(event) {
 
 function bindSessionEvents() {
   bindHelpLinks();
+  document.querySelectorAll("[data-pair-weight]").forEach((input) => input.addEventListener("click", () => openPairWeight(Number(input.dataset.exercise), Number(input.dataset.set))));
+  document.querySelectorAll("[data-pair-weight]").forEach((input) => input.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPairWeight(Number(input.dataset.exercise), Number(input.dataset.set)); } }));
+  document.querySelectorAll("[data-rir]").forEach((select) => select.addEventListener("change", () => { data.currentSession.entries[Number(select.dataset.rir)].rir = select.value; saveData(); }));
+  document.querySelector("#discomfort-status").addEventListener("change", (event) => { data.currentSession.discomfortStatus = event.target.value; document.querySelector("#discomfort-label").hidden = event.target.value !== "yes"; saveData(); });
+  document.querySelector("#discomfort-note").addEventListener("input", (event) => { data.currentSession.discomfortNote = event.target.value; saveData(); });
   document.querySelectorAll("[data-replace-exercise]").forEach((button) => button.addEventListener("click", () => openExerciseReplacement(Number(button.dataset.replaceExercise))));
   document.querySelectorAll("[data-value-picker]").forEach((button) => button.addEventListener("click", () => openValuePicker(button)));
   const timerPreset = document.querySelector("#timer-preset");
@@ -1272,6 +1328,11 @@ function bindSessionEvents() {
       return;
     }
     data.currentSession.entries[exerciseIndex].sets[setIndex][field] = input.value;
+    if (field === "weight") {
+      const set = data.currentSession.entries[exerciseIndex].sets[setIndex];
+      set.weightBasis = input.value.trim() ? "total" : "";
+      if (!input.hasAttribute("data-pair-weight")) set.pairWeights = null;
+    }
     saveData();
     const card = input.closest(".exercise-card");
     const setRows = [...card.querySelectorAll(".set-row")];
@@ -1311,6 +1372,7 @@ function bindSessionEvents() {
     if (entryHasRecordedWork(entry) && !window.confirm("В упражнении уже есть подходы или отметка выполнения. При смене варианта они будут удалены. Продолжить?")) { select.value = String(entry.optionIndex); return; }
     entry.optionIndex = Number(select.value);
     entry.completed = false;
+    entry.rir = "";
     entry.sets = entry.sets.map(() => ({ weight: "", reps: "" }));
     if (!saveData()) { data.currentSession.entries[index] = old; select.value = String(old.optionIndex); return; }
     const scrollPosition = window.scrollY;
@@ -1575,18 +1637,25 @@ function requestFinishWorkout() {
 function finishWorkout(partial = false) {
   const draft = data.currentSession;
   const plan = draft.planSnapshot || workoutPlans[draft.workout];
-  const { planSnapshot, ...sessionRecord } = draft;
+  const { planSnapshot, originalPlanSnapshot, ...sessionRecord } = draft;
   const record = {
     ...sessionRecord,
     status: partial ? "partial" : "completed",
     completedExercises: draft.entries.filter((entry) => entry.completed).length,
     totalExercises: draft.entries.length,
     finishedAt: new Date().toISOString(),
-    entries: draft.entries.map((entry, index) => ({
-      name: (plan.exercises[index].options || [plan.exercises[index].name])[entry.optionIndex],
-      completed: Boolean(entry.completed),
-      sets: entry.sets.map((set) => ({ weight: set.weight, reps: set.reps })),
-    })),
+    entries: draft.entries.map((entry, index) => {
+      const exercise = plan.exercises[index];
+      const name = (exercise.options || [exercise.name])[entry.optionIndex];
+      const original = originalPlanSnapshot?.exercises?.[index];
+      const wasPlannedOption = original && [original.name, ...(original.options || [])].some((option) => exerciseNameKey(option) === exerciseNameKey(name));
+      return {
+        name, completed: Boolean(entry.completed), rir: entry.rir || "",
+        planTarget: { sets: exercise.sets, min: exercise.min, max: exercise.max, sideNote: exercise.sideNote || "" },
+        originalExercise: original && !wasPlannedOption ? original.name : "",
+        sets: entry.sets.map((set) => ({ weight: set.weight, reps: set.reps, weightBasis: set.weightBasis || "", pairWeights: set.pairWeights || null })),
+      };
+    }),
   };
   data.sessions.push(record);
   data.currentSession = null;
@@ -1615,11 +1684,15 @@ function openSessionEditor(id) {
   const form = document.querySelector("#session-editor-form");
   form.elements.date.value = session.date;
   form.elements.effort.value = session.effort || "";
+  form.elements.discomfortStatus.value = ["no", "yes"].includes(session.discomfortStatus) ? session.discomfortStatus : "";
+  form.elements.discomfortNote.value = session.discomfortNote || "";
+  document.querySelector("#edit-discomfort-label").hidden = form.elements.discomfortStatus.value !== "yes";
   document.querySelector("#session-editor-error").hidden = true;
   document.querySelector("#session-editor-entries").innerHTML = session.entries.map((entry, entryIndex) => `
     <article class="session-edit-exercise">
       <div class="session-edit-heading"><h3>${escapeHtml(entry.name)}</h3><label><input type="checkbox" data-session-completed="${entryIndex}" ${entry.completed ? "checked" : ""} /> Выполнено</label></div>
-      ${entry.sets.map((set, setIndex) => `<div class="session-edit-set"><span>Подход ${setIndex + 1}</span><label>Вес, кг<input type="number" min="0" step="any" value="${escapeHtml(set.weight || "")}" data-session-weight="${entryIndex}-${setIndex}" /></label><label>Повторы<input type="number" min="0" max="100" step="1" value="${escapeHtml(set.reps || "")}" data-session-reps="${entryIndex}-${setIndex}" /></label></div>`).join("")}
+      ${entry.sets.map((set, setIndex) => `<div class="session-edit-set"><span>Подход ${setIndex + 1}</span><label>Общий вес, кг<input type="number" min="0" step="any" value="${escapeHtml(set.weight ?? "")}" data-session-weight="${entryIndex}-${setIndex}" /></label><label>Повторы<input type="number" min="0" max="100" step="1" value="${escapeHtml(set.reps ?? "")}" data-session-reps="${entryIndex}-${setIndex}" /></label></div>`).join("")}
+      <label class="rir-field">Запас в последнем подходе<select data-session-rir="${entryIndex}">${rirOptions(entry.rir)}</select></label>
     </article>`).join("");
   showDialog("session-editor-dialog");
 }
@@ -1655,6 +1728,7 @@ function formatWorkoutReport(session) {
     : "Завершена";
   const lines = [
     "Отчёт о тренировке для ИИ-тренера",
+    `Профиль: ${activeProfile.name}`,
     `Дата: ${formatDate(session.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
     `План: ${workoutName}`,
     `Статус: ${status}`,
@@ -1665,19 +1739,30 @@ function formatWorkoutReport(session) {
     const item = measurements.find(([, value]) => Number(value?.[field]) > 0);
     lines.push(item ? `${label}: ${item[1][field]} ${unit} (замер ${formatDate(item[0], { day: "numeric", month: "long", year: "numeric" })})` : `${label}: нет замера на дату тренировки или ранее`);
   }
+  lines.push(session.discomfortStatus === "no" ? "Дискомфорт: нет" : session.discomfortStatus === "yes" ? `Дискомфорт: ${session.discomfortNote?.trim() || "указан, описание не заполнено"}` : "Дискомфорт: не указано");
   lines.push("", "Упражнения и рабочие подходы:");
   session.entries.forEach((entry, index) => {
     lines.push(`${index + 1}. ${entry.name}${entry.completed ? " — выполнено" : " — не отмечено как выполненное"}`);
+    if (entry.originalExercise && exerciseNameKey(entry.originalExercise) !== exerciseNameKey(entry.name)) lines.push(`   В плане: ${entry.originalExercise}; выполнено вместо него: ${entry.name}`);
+    lines.push(entry.planTarget ? `   План занятия: ${entry.planTarget.sets} × ${entry.planTarget.min}–${entry.planTarget.max}${entry.planTarget.sideNote ? ` ${entry.planTarget.sideNote}` : ""}` : "   План на момент тренировки не сохранён");
+    lines.push(`   Запас в последнем подходе: ${entry.rir === "4+" ? "4 и более" : entry.rir !== undefined && entry.rir !== "" ? entry.rir : "не указан"}`);
     const recordedSets = (entry.sets || []).filter((set) => String(set.weight || "").trim() || String(set.reps || "").trim());
     if (!recordedSets.length) {
       lines.push("   Подходы не записаны");
       return;
     }
     recordedSets.forEach((set, setIndex) => {
-      const weight = String(set.weight || "").trim() ? `${set.weight} кг` : "вес не указан";
-      const reps = String(set.reps || "").trim() ? `${set.reps} повт.` : "повторы не указаны";
+      const weight = String(set.weight ?? "").trim() ? `${set.weight} кг${set.weightBasis === "total" ? " (общий вес)" : " (способ записи не указан)"}` : "вес не указан";
+      const reps = String(set.reps ?? "").trim() ? `${set.reps} повт.` : "повторы не указаны";
       lines.push(`   ${setIndex + 1}) ${weight} × ${reps}`);
+      if (set.weightBasis === "total" && Array.isArray(set.pairWeights) && set.pairWeights.length === 2) lines.push(`      Снаряды: ${set.pairWeights[0]} + ${set.pairWeights[1]} кг`);
     });
+    const previous = previousEntry(entry.name, session);
+    const comparable = (sets) => sets?.length && sets.every((set) => String(set.weight ?? "").trim() !== "" && String(set.reps ?? "").trim() !== "" && set.weightBasis === "total");
+    if (previous && previous.sets.length === entry.sets.length && comparable(previous.sets) && comparable(entry.sets)) {
+      const priorSession = orderedSessions().slice(0, orderedSessions().indexOf(session)).reverse().find((item) => item.entries?.includes(previous));
+      lines.push(`   Предыдущий результат${priorSession ? ` (${formatDate(priorSession.date, { day: "numeric", month: "long", year: "numeric" })})` : ""}: ${previous.sets.map((set) => `${set.weight} кг × ${set.reps}`).join(", ")} (общий вес)`);
+    } else lines.push("   Предыдущий сопоставимый результат: нет данных");
   });
   lines.push("", "Проанализируй выполнение плана и нагрузку. Отметь прогресс, если его можно подтвердить этими данными, и подскажи, что отслеживать на следующей тренировке. Не додумывай отсутствующие результаты.");
   return lines.join("\n");
@@ -1728,12 +1813,16 @@ function saveSessionEdit(event) {
   const inPreviousCycle = completedTrainingCount(data.sessions.slice(0, sessionIndex)) < data.programCycle.completedAtStart;
   session.date = String(values.get("date"));
   session.effort = effort;
+  session.discomfortStatus = String(values.get("discomfortStatus") || "");
+  session.discomfortNote = String(values.get("discomfortNote") || "");
   session.entries.forEach((entry, entryIndex) => {
     entry.completed = Boolean(form.querySelector(`[data-session-completed="${entryIndex}"]`)?.checked);
-    entry.sets = entry.sets.map((set, setIndex) => ({
-      weight: form.querySelector(`[data-session-weight="${entryIndex}-${setIndex}"]`).value,
-      reps: form.querySelector(`[data-session-reps="${entryIndex}-${setIndex}"]`).value,
-    }));
+    entry.rir = form.querySelector(`[data-session-rir="${entryIndex}"]`).value;
+    entry.sets = entry.sets.map((set, setIndex) => {
+      const weight = form.querySelector(`[data-session-weight="${entryIndex}-${setIndex}"]`).value;
+      const changed = weight !== String(set.weight ?? "");
+      return { ...set, weight, reps: form.querySelector(`[data-session-reps="${entryIndex}-${setIndex}"]`).value, weightBasis: changed ? (weight === "" ? "" : "total") : (set.weightBasis || ""), pairWeights: changed ? null : (set.pairWeights || null) };
+    });
   });
   session.completedExercises = session.entries.filter((entry) => entry.completed).length;
   session.totalExercises = session.entries.length;
@@ -1868,6 +1957,12 @@ function applyTheme(theme) {
 }
 
 function bindEvents() {
+  document.querySelector("#pair-weight-form").addEventListener("submit", savePairWeight);
+  document.querySelector("#pair-weight-form").addEventListener("input", (event) => {
+    const form = event.currentTarget, a = form.elements.first.value, b = form.elements.second.value;
+    document.querySelector("#pair-weight-sum").textContent = a !== "" && b !== "" && form.checkValidity() ? `Общий вес: ${Number((Number(a) + Number(b)).toFixed(4))} кг` : "";
+  });
+  document.querySelector("#session-editor-form [name=discomfortStatus]").addEventListener("change", (event) => { document.querySelector("#edit-discomfort-label").hidden = event.target.value !== "yes"; });
   document.querySelector("#replace-exercise-search").addEventListener("input", renderReplacementOptions);
   document.querySelector("#replace-exercise-form").addEventListener("submit", replaceExercise);
   document.querySelector("#theme-toggle").addEventListener("click", () => {
