@@ -1174,12 +1174,8 @@ function openPairWeight(index, setIndex) {
   pairWeightTarget = { index, setIndex };
   const form = document.querySelector("#pair-weight-form");
   document.querySelector("#pair-weight-title").textContent = isKettlebell ? "Вес двух гирь" : "Вес двух гантелей";
-  document.querySelector("#pair-weight-description").textContent = isKettlebell ? "Укажи вес каждой гири. В подход запишется общий вес пары." : "Укажи вес каждой гантели. В подход запишется общий вес пары.";
-  form.elements.first.parentElement.firstChild.textContent = isKettlebell ? "Первая гиря, кг" : "Первая гантель, кг";
-  form.elements.second.parentElement.firstChild.textContent = isKettlebell ? "Вторая гиря, кг" : "Вторая гантель, кг";
-  form.elements.first.value = set.pairWeights?.[0] ?? "";
-  form.elements.second.value = set.pairWeights?.[1] ?? "";
-  document.querySelector("#pair-weight-sum").textContent = set.weight ? `Текущий общий вес: ${set.weight} кг` : "";
+  document.querySelector("#pair-weight-description").textContent = isKettlebell ? "Укажи суммарный вес обеих гирь." : "Укажи суммарный вес обеих гантелей.";
+  form.elements.total.value = set.weight ?? "";
   showDialog("pair-weight-dialog");
 }
 
@@ -1191,9 +1187,9 @@ function savePairWeight(event) {
   const set = data.currentSession?.entries[index]?.sets[setIndex];
   const input = document.querySelector(`#weight-${index}-${setIndex}`);
   if (!set || !input) return;
-  const first = form.elements.first.value, second = form.elements.second.value;
-  set.pairWeights = [first, second];
-  input.value = String(Number((Number(first) + Number(second)).toFixed(4)));
+  const total = form.elements.total.value;
+  if (Number(total) !== Number(set.weight) || String(set.weight ?? "") === "") set.pairWeights = null;
+  input.value = total;
   input.dispatchEvent(new Event("input", { bubbles: true }));
   closeDialog(document.querySelector("#pair-weight-dialog"));
   pairWeightTarget = null;
@@ -1958,10 +1954,6 @@ function applyTheme(theme) {
 
 function bindEvents() {
   document.querySelector("#pair-weight-form").addEventListener("submit", savePairWeight);
-  document.querySelector("#pair-weight-form").addEventListener("input", (event) => {
-    const form = event.currentTarget, a = form.elements.first.value, b = form.elements.second.value;
-    document.querySelector("#pair-weight-sum").textContent = a !== "" && b !== "" && form.checkValidity() ? `Общий вес: ${Number((Number(a) + Number(b)).toFixed(4))} кг` : "";
-  });
   document.querySelector("#session-editor-form [name=discomfortStatus]").addEventListener("change", (event) => { document.querySelector("#edit-discomfort-label").hidden = event.target.value !== "yes"; });
   document.querySelector("#replace-exercise-search").addEventListener("input", renderReplacementOptions);
   document.querySelector("#replace-exercise-form").addEventListener("submit", replaceExercise);

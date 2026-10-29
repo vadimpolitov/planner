@@ -10,7 +10,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <title>Ритм — планировщик тренировок</title>
     <script>try { document.documentElement.dataset.theme = localStorage.getItem("ritm-theme") === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }</script>
-    <link rel="stylesheet" href="style.css?v=3.7" />
+    <link rel="stylesheet" href="style.css?v=3.8" />
   </head>
   <body>
     <div class="app-shell">
@@ -195,9 +195,9 @@
     <div class="dialog-backdrop" id="pair-weight-dialog" hidden>
       <section class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="pair-weight-title">
         <button class="dialog-close" type="button" data-close-dialog="pair-weight-dialog" aria-label="Закрыть">×</button>
-        <p class="eyebrow">ВЕС ДВУХ СНАРЯДОВ</p><h2 id="pair-weight-title">Вес двух гантелей</h2>
-        <p class="dialog-description" id="pair-weight-description">Укажи вес каждого снаряда. В подход запишется общий вес пары.</p>
-        <form id="pair-weight-form" class="dialog-form"><label>Первая гантель, кг<input name="first" type="number" min="0" step="any" inputmode="decimal" required /></label><label>Вторая гантель, кг<input name="second" type="number" min="0" step="any" inputmode="decimal" required /></label><p id="pair-weight-sum" class="form-status" aria-live="polite"></p><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="pair-weight-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить вес</button></div></form>
+        <h2 id="pair-weight-title">Вес двух гантелей</h2>
+        <p class="dialog-description" id="pair-weight-description">Укажи суммарный вес обеих гантелей.</p>
+        <form id="pair-weight-form" class="dialog-form"><label>Суммарный вес, кг<input name="total" type="number" min="0" step="any" inputmode="decimal" required /></label><div class="dialog-actions"><button class="secondary-button" type="button" data-close-dialog="pair-weight-dialog">Отмена</button><button class="primary-button" type="submit">Сохранить вес</button></div></form>
       </section>
     </div>
     <div class="dialog-backdrop" id="value-picker-dialog" hidden>
@@ -217,6 +217,6 @@
       </section>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=3.7"></script>
+    <script src="script.js?v=3.8"></script>
   </body>
 </html>
