@@ -829,17 +829,17 @@ h1, h2, h3 { font-family: "Manrope", "Segoe UI", sans-serif; }
 }
 
 /* The supplied character sheets contain 14 individual still poses. */
-.character-slot { display:flex; flex:0 0 160px; align-self:stretch; justify-content:center; align-items:flex-start; min-height:150px; margin-left:16px; overflow:hidden; }
+.character-slot { display:flex; flex:0 0 160px; align-self:stretch; justify-content:center; align-items:center; min-height:200px; margin-left:16px; overflow:hidden; }
 .character { display:block; width:112px; aspect-ratio:1; background-color:transparent; background-image:var(--character-image); background-repeat:no-repeat; background-size:100% 100%; background-position:center; image-rendering:pixelated; overflow:hidden; }
-.character-hero { flex:none; width:160px; transform:scale(1.9); transform-origin:center 12%; }
+.character-hero { flex:none; width:200px; }
 .character-small { width:100px; }
 .character-result { width:min(210px, 55vw); }
 .character-timer { width:50px; }
 .timer-display-header #timer-status { margin-right:auto; }
 .character-heading { display:flex; align-items:center; gap:12px; }
 .result-character { display:flex; justify-content:center; margin:12px 0; }
-@media (max-width:620px) { .character-slot { flex-basis:120px; min-height:140px; margin-left:6px; } .character-hero { width:120px; transform:scale(2); } }
-@media (max-width:360px) { .character-slot { flex-basis:98px; min-height:130px; } .character-hero { width:98px; transform:scale(2); } }
+@media (max-width:620px) { .character-slot { flex-basis:130px; min-height:200px; margin-left:6px; } .character-hero { width:200px; } }
+@media (max-width:360px) { .character-slot { flex-basis:110px; min-height:170px; } .character-hero { width:170px; } }
 :root[data-theme="dark"] .chart-grid-line { stroke:#435548; }
 :root[data-theme="dark"] :is(.chart-axis-label,.chart-date-label,.chart-value-label) { fill:#c2d1c5; }
 :root[data-theme="dark"] .chart-point { fill:#1c2921; }
