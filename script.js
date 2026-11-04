@@ -272,6 +272,7 @@ const muscleWikiExercisePages = {
   "lat-pulldown": "machine-pulldown",
   pullup: "pull-ups",
   "split-squat": "dumbbell-bulgarian-split-squat",
+  "cable-leg-curl": "cable-hamstring-curl",
   "lateral-raise": "dumbbell-lateral-raise",
   "side-plank": "elbow-side-plank",
   "leg-press": "machine-leg-press",
@@ -279,7 +280,6 @@ const muscleWikiExercisePages = {
 
 const muscleWikiExerciseCategories = {
   "supported-row": "lats",
-  "cable-leg-curl": "hamstrings",
   "biceps-curl": "biceps",
   "leg-curl": "hamstrings",
 };
